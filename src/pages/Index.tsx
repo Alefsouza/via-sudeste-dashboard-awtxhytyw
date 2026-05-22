@@ -47,7 +47,7 @@ const EmptyState = () => (
       alt="Empty"
       className="w-24 h-24 mb-4 opacity-70"
     />
-    <p className="text-[14px] font-normal">Nenhum dado para este período</p>
+    <p className="text-[14px] font-normal">Nenhum dado para este período. Tente outro filtro.</p>
   </div>
 )
 
@@ -119,22 +119,94 @@ export default function Index() {
     fetchData(debouncedFilters)
   }, [debouncedFilters])
 
-  const fetchData = async (currentFilters: any) => {
-    setLoading(true)
-    setErrorMsg('')
-    try {
-      const payload = {
-        start_date: currentFilters.startDate,
-        end_date: currentFilters.endDate,
-        garage: currentFilters.garage,
-        event: currentFilters.event,
-        eventType: currentFilters.eventType,
+  const sanitize = (str: any) => {
+    if (typeof str !== 'string') return str
+    return str.replace(/[&<>'"]/g, (tag) => {
+      const charsToReplace: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;',
       }
+      return charsToReplace[tag] || tag
+    })
+  }
+
+  const deepSanitize = (obj: any): any => {
+    if (typeof obj === 'string') return sanitize(obj)
+    if (Array.isArray(obj)) return obj.map(deepSanitize)
+    if (obj && typeof obj === 'object') {
+      const newObj: any = {}
+      for (const [k, v] of Object.entries(obj)) {
+        newObj[k] = deepSanitize(v)
+      }
+      return newObj
+    }
+    return obj
+  }
+
+  const fetchData = async (currentFilters: any, isRetry = false) => {
+    setLoading(true)
+    if (!isRetry) setErrorMsg('')
+
+    if (!isRetry) {
+      try {
+        const healthAbort = new AbortController()
+        const healthTimeout = setTimeout(() => healthAbort.abort(), 10000)
+        const healthRes = await pb.send('/backend/v1/fetchDatalbusData/healthcheck', {
+          method: 'GET',
+          signal: healthAbort.signal as any,
+        })
+        clearTimeout(healthTimeout)
+        if (!healthRes || healthRes.status !== 'ok') {
+          throw new Error('HEALTH_FAILED')
+        }
+      } catch (e: any) {
+        if (e.isAbort || e.name === 'AbortError') {
+          setErrorMsg('Conexão lenta. Verifique sua internet.')
+        } else {
+          setErrorMsg('Conexão com API indisponível. Tente novamente em alguns minutos.')
+        }
+        setLoading(false)
+        return
+      }
+    }
+
+    const cacheKey = `datalbus_data_${JSON.stringify(currentFilters)}`
+    const cachedStr = localStorage.getItem(cacheKey)
+    if (cachedStr) {
+      try {
+        const cached = JSON.parse(cachedStr)
+        if (Date.now() - cached.timestamp < 5 * 60 * 1000) {
+          setData(cached.data)
+          setLoading(false)
+          return
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+
+    const payload = {
+      start_date: currentFilters.startDate,
+      end_date: currentFilters.endDate,
+      garage: currentFilters.garage,
+      event: currentFilters.event,
+      eventType: currentFilters.eventType,
+    }
+
+    const fetchAbort = new AbortController()
+    const fetchTimeout = setTimeout(() => fetchAbort.abort(), 10000)
+
+    try {
       const res = await pb.send('/backend/v1/fetchDatalbusData', {
         method: 'POST',
         body: JSON.stringify(payload),
         headers: { 'Content-Type': 'application/json' },
+        signal: fetchAbort.signal as any,
       })
+      clearTimeout(fetchTimeout)
 
       if (
         res.success &&
@@ -142,19 +214,43 @@ export default function Index() {
         Array.isArray(res.data.assets) &&
         Array.isArray(res.data.tripEvents)
       ) {
-        setData(res.data)
+        const finalData = deepSanitize(res.data)
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            timestamp: Date.now(),
+            data: finalData,
+          }),
+        )
+        setData(finalData)
       } else {
-        setErrorMsg(res.error || 'Formato de dados inválido recebido da API')
+        setErrorMsg(res.error || 'Erro desconhecido. Use o Bug Scanner para diagnosticar.')
       }
     } catch (err: any) {
-      if (err.response && err.response.error) {
-        setErrorMsg(err.response.error)
+      clearTimeout(fetchTimeout)
+      if (err.isAbort || err.name === 'AbortError') {
+        if (!isRetry) {
+          setErrorMsg('Conexão lenta. Aguarde...')
+          setTimeout(() => fetchData(currentFilters, true), 3000)
+          return
+        } else {
+          setErrorMsg('Conexão lenta. Verifique sua internet.')
+        }
       } else {
-        setErrorMsg('Erro ao carregar dados. Verifique a conexão com a API.')
+        const status = err.status || 500
+        if (status === 401) {
+          setErrorMsg('Credenciais inválidas. Verifique as variáveis de ambiente no Secrets.')
+        } else if (status === 400) {
+          setErrorMsg('Parâmetros obrigatórios faltando. Selecione datas válidas.')
+        } else if (status === 503) {
+          setErrorMsg('Serviço Datalbus indisponível. Tente novamente em alguns minutos.')
+        } else {
+          setErrorMsg('Erro desconhecido. Use o Bug Scanner para diagnosticar.')
+        }
       }
-    } finally {
-      setLoading(false)
     }
+
+    setLoading(false)
   }
 
   const options = useMemo(() => {
