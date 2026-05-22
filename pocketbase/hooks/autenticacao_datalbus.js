@@ -6,8 +6,8 @@ routerAdd('POST', '/backend/v1/autenticacaoDatalbus', (e) => {
   }
 
   const body = e.requestInfo().body || {}
-  const email = body.email
-  const password = body.password
+  const email = body.email || $secrets.get('DATALBUS_EMAIL')
+  const password = body.password || $secrets.get('DATALBUS_PASSWORD')
 
   if (!email || !password) {
     return e.json(401, {
