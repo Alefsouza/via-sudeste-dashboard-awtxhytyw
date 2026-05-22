@@ -1,0 +1,192 @@
+routerAdd(
+  'POST',
+  '/backend/v1/buscaDadosDatalbus',
+  (e) => {
+    const body = e.requestInfo().body || {}
+    const token = body.token
+    const tenancy_id = body.tenancy_id
+    const action = body.action
+    const filters = body.filters || {}
+
+    if (!token || !tenancy_id || !action) {
+      return e.json(400, {
+        success: false,
+        error: 'Campos obrigatórios ausentes: token, tenancy_id ou action',
+        statusCode: 400,
+        action: action || 'unknown',
+      })
+    }
+
+    const endpoints = {
+      assets: 'https://datalbus.com.br:8000/api/v2/assets',
+      drivers: 'https://datalbus.com.br:8000/api/v2/drivers',
+      trips: 'https://datalbus.com.br:8000/api/v2/trips',
+      tripEvents: 'https://datalbus.com.br:8000/api/v2/trip-events',
+    }
+
+    const url = endpoints[action]
+    if (!url) {
+      return e.json(400, {
+        success: false,
+        error: 'Ação inválida. Ações permitidas: assets, drivers, trips, tripEvents',
+        statusCode: 400,
+        action: action,
+      })
+    }
+
+    const wait = (ms) => {
+      const start = Date.now()
+      while (Date.now() - start < ms) {
+        // delay loop
+      }
+    }
+
+    const delays = [0, 2000, 4000, 8000]
+    const maxAttempts = 4
+    let attempt = 0
+
+    let success = false
+    let res
+    let lastStatusCode = 500
+    let lastErrorMsg = ''
+
+    while (attempt < maxAttempts) {
+      if (delays[attempt] > 0) {
+        wait(delays[attempt])
+      }
+
+      try {
+        res = $http.send({
+          url: url,
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/json',
+          },
+          timeout: 30,
+        })
+
+        lastStatusCode = res.statusCode
+
+        if (res.statusCode === 200) {
+          success = true
+          break
+        } else if (res.statusCode === 429) {
+          lastErrorMsg = 'Muitas requisições (Rate Limit)'
+          attempt++
+          continue
+        } else if (res.statusCode === 401) {
+          return e.json(401, {
+            success: false,
+            error: 'Token expirado ou inválido',
+            statusCode: 401,
+            action: action,
+          })
+        } else {
+          return e.json(res.statusCode, {
+            success: false,
+            error: 'Erro na API externa: ' + res.statusCode,
+            statusCode: res.statusCode,
+            action: action,
+          })
+        }
+      } catch (err) {
+        return e.json(500, {
+          success: false,
+          error: 'Falha de comunicação com o servidor externo',
+          statusCode: 500,
+          action: action,
+        })
+      }
+    }
+
+    if (!success) {
+      return e.json(lastStatusCode, {
+        success: false,
+        error: lastErrorMsg,
+        statusCode: lastStatusCode,
+        action: action,
+      })
+    }
+
+    let rawData = []
+    try {
+      const parsed = res.json
+      if (Array.isArray(parsed)) {
+        rawData = parsed
+      } else if (parsed && Array.isArray(parsed.data)) {
+        rawData = parsed.data
+      } else if (parsed && typeof parsed === 'object') {
+        rawData = [parsed]
+      }
+    } catch (err) {
+      return e.json(500, {
+        success: false,
+        error: 'Erro ao processar a resposta da API',
+        statusCode: 500,
+        action: action,
+      })
+    }
+
+    let normalizedData = []
+    for (let i = 0; i < rawData.length; i++) {
+      const item = rawData[i]
+      let obj = {}
+
+      if (action === 'assets') {
+        obj = {
+          id: item.id,
+          vehicle_id: item.vehicle_id,
+          plate: item.plate,
+          status: item.status,
+          last_update: item.last_update,
+        }
+      } else if (action === 'drivers') {
+        obj = {
+          id: item.id,
+          name: item.name,
+          license_category: item.license_category,
+          status: item.status,
+        }
+      } else if (action === 'trips') {
+        obj = {
+          id: item.id,
+          vehicle_id: item.vehicle_id,
+          start_time: item.start_time,
+          end_time: item.end_time,
+          distance_km: item.distance_km,
+        }
+      } else if (action === 'tripEvents') {
+        obj = {
+          id: item.id,
+          event_type: item.event_type,
+          severity: item.severity,
+          timestamp: item.timestamp,
+          description: item.description,
+        }
+      }
+      normalizedData.push(obj)
+    }
+
+    if (filters && Object.keys(filters).length > 0) {
+      normalizedData = normalizedData.filter((item) => {
+        for (const key in filters) {
+          if (item[key] !== filters[key]) {
+            return false
+          }
+        }
+        return true
+      })
+    }
+
+    return e.json(200, {
+      success: true,
+      action: action,
+      count: normalizedData.length,
+      data: normalizedData,
+      tenancy_id: tenancy_id,
+      timestamp: new Date().toISOString(),
+    })
+  },
+  $apis.requireAuth(),
+)
