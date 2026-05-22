@@ -1,6 +1,6 @@
-routerAdd('OPTIONS', '/backend/v1/fetchDatalbusData/healthcheck', (e) => {
+routerAdd('OPTIONS', '/backend/v1/healthcheckDatalbus', (e) => {
   e.response.header().set('Access-Control-Allow-Origin', '*')
-  e.response.header().set('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  e.response.header().set('Access-Control-Allow-Headers', 'authorization, apikey, content-type')
+  e.response.header().set('Access-Control-Allow-Methods', 'GET, POST')
+  e.response.header().set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   return e.noContent(204)
 })
