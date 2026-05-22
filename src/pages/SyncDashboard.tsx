@@ -1,14 +1,36 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
-import { 
-  RefreshCw, CheckCircle2, XCircle, Clock, Trash2, 
-  Database, Users, MapPin, AlertTriangle, Play, Activity 
+import {
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Trash2,
+  Database,
+  Users,
+  MapPin,
+  AlertTriangle,
+  Play,
+  Activity,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
@@ -20,15 +42,15 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 export default function SyncDashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
-  
+
   const [status, setStatus] = useState<'online' | 'offline' | 'checking'>('checking')
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [nextSyncIn, setNextSyncIn] = useState<number>(300)
-  
+
   const [logs, setLogs] = useState<SyncLog[]>([])
   const [logFilter, setLogFilter] = useState('all_records')
   const [isSyncing, setIsSyncing] = useState<Record<string, boolean>>({})
-  
+
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const loadLogs = useCallback(async () => {
@@ -64,7 +86,7 @@ export default function SyncDashboard() {
   useEffect(() => {
     checkHealth()
     const timer = setInterval(() => {
-      setNextSyncIn(prev => {
+      setNextSyncIn((prev) => {
         if (prev <= 1) {
           checkHealth()
           return 300
@@ -81,9 +103,12 @@ export default function SyncDashboard() {
       debounceRef.current = null
     }, 300)
 
-    setIsSyncing(prev => ({ ...prev, [type]: true }))
-    toast({ title: 'Sincronizando...', description: `Iniciando sincronização de ${type === 'all' ? 'todos os dados' : type}.` })
-    
+    setIsSyncing((prev) => ({ ...prev, [type]: true }))
+    toast({
+      title: 'Sincronizando...',
+      description: `Iniciando sincronização de ${type === 'all' ? 'todos os dados' : type}.`,
+    })
+
     const start = Date.now()
     try {
       let totalRecords = 0
@@ -102,7 +127,7 @@ export default function SyncDashboard() {
           totalRecords = res.data.length
         }
       }
-      
+
       const duration_ms = Date.now() - start
       await createSyncLog({
         type,
@@ -111,10 +136,10 @@ export default function SyncDashboard() {
         duration_ms,
       })
 
-      toast({ 
+      toast({
         title: 'Sincronizado com sucesso.',
         description: `${totalRecords} registros importados.`,
-        variant: 'default'
+        variant: 'default',
       })
     } catch (e: any) {
       const duration_ms = Date.now() - start
@@ -123,15 +148,15 @@ export default function SyncDashboard() {
         status: 'error',
         records_count: 0,
         duration_ms,
-        error_message: e.message || 'Erro desconhecido'
+        error_message: e.message || 'Erro desconhecido',
       })
-      toast({ 
+      toast({
         title: 'Erro ao sincronizar. Tente novamente.',
         description: e.message,
-        variant: 'destructive'
+        variant: 'destructive',
       })
     } finally {
-      setIsSyncing(prev => ({ ...prev, [type]: false }))
+      setIsSyncing((prev) => ({ ...prev, [type]: false }))
     }
   }
 
@@ -168,7 +193,9 @@ export default function SyncDashboard() {
     <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto animate-fade-in-up">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Sincronismo Datalbus</h1>
-        <p className="text-muted-foreground mt-1">Gerencie a integração com a API Datalbus e sincronize os dados manualmente.</p>
+        <p className="text-muted-foreground mt-1">
+          Gerencie a integração com a API Datalbus e sincronize os dados manualmente.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -183,15 +210,23 @@ export default function SyncDashboard() {
             <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
               <span className="text-sm font-medium">Status</span>
               <div className="flex items-center gap-2">
-                {status === 'checking' && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
+                {status === 'checking' && (
+                  <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
                 {status === 'online' && (
-                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-500/10 text-emerald-600 border-emerald-200"
+                  >
                     <span className="h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
                     Online
                   </Badge>
                 )}
                 {status === 'offline' && (
-                  <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                  <Badge
+                    variant="outline"
+                    className="bg-destructive/10 text-destructive border-destructive/20"
+                  >
                     <span className="h-2 w-2 rounded-full bg-destructive mr-2" />
                     Offline
                   </Badge>
@@ -200,7 +235,9 @@ export default function SyncDashboard() {
             </div>
 
             {status === 'offline' && (
-              <p className="text-sm text-destructive font-medium -mt-2">API indisponível. Verifique a conexão ou tente novamente.</p>
+              <p className="text-sm text-destructive font-medium -mt-2">
+                API indisponível. Verifique a conexão ou tente novamente.
+              </p>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -221,8 +258,8 @@ export default function SyncDashboard() {
             </div>
 
             <div className="mt-auto pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full h-11"
                 onClick={checkHealth}
                 disabled={status === 'checking'}
@@ -291,7 +328,7 @@ export default function SyncDashboard() {
               Histórico de Sincronismo
             </CardTitle>
             <CardDescription>Últimos 10 registros de sincronização</CardDescription>
-          </CardHeader>
+          </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Select value={logFilter} onValueChange={setLogFilter}>
               <SelectTrigger className="w-full sm:w-[190px] h-10">
@@ -306,7 +343,13 @@ export default function SyncDashboard() {
                 <SelectItem value="all">Sincronização Completa</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="icon" onClick={handleClearLogs} title="Limpar histórico" className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClearLogs}
+              title="Limpar histórico"
+              className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -345,14 +388,15 @@ export default function SyncDashboard() {
                             <CheckCircle2 className="h-4 w-4" /> Sucesso
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 text-destructive text-sm font-medium" title={log.error_message}>
+                          <div
+                            className="flex items-center gap-1.5 text-destructive text-sm font-medium"
+                            title={log.error_message}
+                          >
                             <XCircle className="h-4 w-4" /> Erro
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {log.records_count}
-                      </TableCell>
+                      <TableCell className="text-right font-medium">{log.records_count}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {(log.duration_ms / 1000).toFixed(2)}s
                       </TableCell>
