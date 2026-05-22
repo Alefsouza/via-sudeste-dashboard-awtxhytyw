@@ -17,11 +17,16 @@ routerAdd(
       })
     }
 
+    let baseUrl = $secrets.get('DATALBUS_BASE_URL') || 'https://datalbus.com.br:8000/api/v2'
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1)
+    }
+
     const endpoints = {
-      assets: 'https://datalbus.com.br:8000/api/v2/assets',
-      drivers: 'https://datalbus.com.br:8000/api/v2/drivers',
-      trips: 'https://datalbus.com.br:8000/api/v2/trips',
-      tripEvents: 'https://datalbus.com.br:8000/api/v2/trip-events',
+      assets: baseUrl + '/assets',
+      drivers: baseUrl + '/drivers',
+      trips: baseUrl + '/trips',
+      tripEvents: baseUrl + '/trip-events',
     }
 
     const url = endpoints[action]
