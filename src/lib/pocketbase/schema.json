@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-22T14:21:05.678Z",
+  "generatedAt": "2026-05-22T14:28:45.221Z",
   "collections": [
     {
       "name": "users",
@@ -29,25 +29,248 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
         "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
       ]
+    },
+    {
+      "name": "vehicles",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "plate",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["moving", "idle", "maintenance"]
+        },
+        {
+          "name": "last_latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_vehicles_plate ON vehicles (plate)",
+        "CREATE INDEX idx_vehicles_status ON vehicles (status)"
+      ]
+    },
+    {
+      "name": "telemetry_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "vehicle_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "speed",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_level",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rpm",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "engine_temp",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_telemetry_vehicle ON telemetry_logs (vehicle_id, created DESC)"]
+    },
+    {
+      "name": "alerts",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "vehicle_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["overspeed", "harsh_braking", "low_fuel"]
+        },
+        {
+          "name": "severity",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["low", "medium", "high"]
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_alerts_vehicle ON alerts (vehicle_id, severity, resolved)"]
+    },
+    {
+      "name": "drivers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "license_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }
