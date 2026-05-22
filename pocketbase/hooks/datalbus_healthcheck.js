@@ -1,7 +1,7 @@
-routerAdd('POST', '/backend/v1/healthcheckDatalbus', (e) => {
+routerAdd('POST', '/backend/v1/datalbus_healthcheck', (e) => {
   const body = e.requestInfo().body || {}
-  const token = body.token
-  const tenancy_id = body.tenancy_id
+  let token = body.token
+  let tenancy_id = body.tenancy_id
 
   if (!token || !tenancy_id) {
     return e.json(400, {
@@ -12,6 +12,19 @@ routerAdd('POST', '/backend/v1/healthcheckDatalbus', (e) => {
       statusCode: 400,
       timestamp: new Date().toISOString(),
     })
+  }
+
+  if (token === 'auto' || token === 'dummy') {
+    try {
+      const cache = $app.findFirstRecordByData('integration_cache', 'key', 'datalbus_token')
+      const val = cache.get('value')
+      if (val && val.token) {
+        token = val.token
+        if (val.tenancy_id) tenancy_id = val.tenancy_id
+      }
+    } catch (err) {
+      // Continue and fallback to token if not found
+    }
   }
 
   try {

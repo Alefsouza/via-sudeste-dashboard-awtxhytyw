@@ -155,8 +155,15 @@ export default function Index() {
         const healthAbort = new AbortController()
         const healthTimeout = setTimeout(() => healthAbort.abort(), 10000)
         const healthRes = await pb.send('/backend/v1/datalbus_healthcheck', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${pb.authStore.token}`,
+          },
+          body: JSON.stringify({
+            token: 'auto',
+            tenancy_id: 'auto',
+          }),
           signal: healthAbort.signal as any,
         })
         clearTimeout(healthTimeout)
