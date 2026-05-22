@@ -69,7 +69,10 @@ export function useDatalbusApi<T extends DatalbusAction>(
       Object.keys(finalFilters).length === 0
     ) {
       const today = new Date()
-      const dateStr = today.toISOString().split('T')[0]
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
       finalFilters.start_date = `${dateStr} 00:00:00`
       finalFilters.end_date = `${dateStr} 23:59:59`
     }
@@ -80,8 +83,7 @@ export function useDatalbusApi<T extends DatalbusAction>(
     try {
       const res = await pb.send('/backend/v1/autenticacao_datalbus', {
         method: 'POST',
-        body: JSON.stringify({}),
-        headers: { 'Content-Type': 'application/json' },
+        body: {},
       })
 
       if (res && res.success && res.token && res.tenancy_id) {
@@ -109,15 +111,18 @@ export function useDatalbusApi<T extends DatalbusAction>(
       setLoading(true)
       setError(null)
       try {
+        const payload: Record<string, unknown> = {
+          token: currentToken,
+          tenancy_id: currentTenancyId,
+          action: currentAction,
+        }
+        if (Object.keys(currentFilters).length > 0) {
+          payload.filters = currentFilters
+        }
+
         const res = await pb.send('/backend/v1/buscaDadosDatalbus', {
           method: 'POST',
-          body: JSON.stringify({
-            token: currentToken,
-            tenancy_id: currentTenancyId,
-            action: currentAction,
-            filters: currentFilters,
-          }),
-          headers: { 'Content-Type': 'application/json' },
+          body: payload,
         })
 
         if (res && res.success && Array.isArray(res.data)) {

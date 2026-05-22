@@ -5,8 +5,7 @@ let tokenCache: { token: string; tenancy_id: string } | null = null
 export const authenticateDatalbus = async () => {
   const res = await pb.send('/backend/v1/autenticacao_datalbus', {
     method: 'POST',
-    body: JSON.stringify({}),
-    headers: { 'Content-Type': 'application/json' },
+    body: {},
   })
   if (res?.success && res?.token && res?.tenancy_id) {
     tokenCache = { token: res.token, tenancy_id: res.tenancy_id }
@@ -33,7 +32,11 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     Object.keys(finalFilters).length === 0
   ) {
     const today = new Date()
-    const dateStr = today.toISOString().split('T')[0]
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
     finalFilters = {
       start_date: `${dateStr} 00:00:00`,
       end_date: `${dateStr} 23:59:59`,
@@ -41,22 +44,26 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
   }
 
   const makeRequest = async (endpoint: string, currentToken: string, currentTenancy: string) => {
+    const payload: Record<string, any> = {
+      token: currentToken,
+      tenancy_id: currentTenancy,
+      action,
+    }
+
+    if (Object.keys(finalFilters).length > 0) {
+      payload.filters = finalFilters
+    }
+
     return pb.send(endpoint, {
       method: 'POST',
-      body: JSON.stringify({
-        token: currentToken,
-        tenancy_id: currentTenancy,
-        action,
-        filters: Object.keys(finalFilters).length > 0 ? finalFilters : undefined,
-      }),
-      headers: { 'Content-Type': 'application/json' },
+      body: payload,
     })
   }
 
   let res
   try {
     res = await makeRequest(
-      '/backend/v1/busca_dados_datalbus',
+      '/backend/v1/buscaDadosDatalbus',
       tokenCache!.token,
       tokenCache!.tenancy_id,
     )
@@ -65,7 +72,7 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
       await authenticateDatalbus()
       try {
         res = await makeRequest(
-          '/backend/v1/busca_dados_datalbus',
+          '/backend/v1/buscaDadosDatalbus',
           tokenCache!.token,
           tokenCache!.tenancy_id,
         )
@@ -73,7 +80,7 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
         if (retryErr?.status === 404) {
           try {
             res = await makeRequest(
-              '/backend/v1/buscaDadosDatalbus',
+              '/backend/v1/busca_dados_datalbus',
               tokenCache!.token,
               tokenCache!.tenancy_id,
             )
@@ -91,7 +98,7 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     } else if (err?.status === 404) {
       try {
         res = await makeRequest(
-          '/backend/v1/buscaDadosDatalbus',
+          '/backend/v1/busca_dados_datalbus',
           tokenCache!.token,
           tokenCache!.tenancy_id,
         )
@@ -123,8 +130,7 @@ export const checkDatalbusHealth = async () => {
   try {
     const res = await pb.send('/backend/v1/datalbus_healthcheck', {
       method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' },
+      body: payload,
     })
     return res
   } catch (err: any) {
@@ -136,8 +142,7 @@ export const checkDatalbusHealth = async () => {
       }
       return pb.send('/backend/v1/datalbus_healthcheck', {
         method: 'POST',
-        body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'application/json' },
+        body: payload,
       })
     }
     throw err
