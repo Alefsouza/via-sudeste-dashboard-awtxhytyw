@@ -84,8 +84,18 @@ routerAdd(
 
       try {
         const remainingTime = Math.max(1, 30 - Math.floor(elapsedAfterWait / 1000))
+
+        let finalUrl = url
+        if (filters && Object.keys(filters).length > 0) {
+          const queryParams = []
+          for (const key in filters) {
+            queryParams.push(encodeURIComponent(key) + '=' + encodeURIComponent(filters[key]))
+          }
+          finalUrl += '?' + queryParams.join('&')
+        }
+
         res = $http.send({
-          url: url,
+          url: finalUrl,
           method: 'GET',
           headers: {
             Authorization: 'Bearer ' + token,
@@ -199,6 +209,7 @@ routerAdd(
     if (filters && Object.keys(filters).length > 0) {
       normalizedData = normalizedData.filter((item) => {
         for (const key in filters) {
+          if (key === 'start_date' || key === 'end_date') continue
           if (item[key] !== filters[key]) {
             return false
           }

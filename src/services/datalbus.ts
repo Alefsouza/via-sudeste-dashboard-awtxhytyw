@@ -21,6 +21,13 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
   }
 
   let finalFilters = { ...filters }
+
+  Object.keys(finalFilters).forEach((key) => {
+    if (finalFilters[key] === undefined || finalFilters[key] === null || finalFilters[key] === '') {
+      delete finalFilters[key]
+    }
+  })
+
   if (
     (action === 'trips' || action === 'tripEvents' || action === 'events') &&
     Object.keys(finalFilters).length === 0
@@ -28,8 +35,8 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     const today = new Date()
     const dateStr = today.toISOString().split('T')[0]
     finalFilters = {
-      start_date: `${dateStr} 00:00:00`,
-      end_date: `${dateStr} 23:59:59`,
+      start_date: `${dateStr}T00:00:00Z`,
+      end_date: `${dateStr}T23:59:59Z`,
     }
   }
 
@@ -40,7 +47,7 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
         token: currentToken,
         tenancy_id: currentTenancy,
         action,
-        filters: finalFilters,
+        filters: Object.keys(finalFilters).length > 0 ? finalFilters : undefined,
       }),
       headers: { 'Content-Type': 'application/json' },
     })
