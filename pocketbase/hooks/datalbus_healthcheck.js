@@ -15,8 +15,13 @@ routerAdd('POST', '/backend/v1/healthcheckDatalbus', (e) => {
   }
 
   try {
+    let baseUrl = $secrets.get('DATALBUS_BASE_URL')
+    if (!baseUrl) {
+      baseUrl = 'https://datalbus.com.br:8000/api/v2'
+    }
+
     const res = $http.send({
-      url: 'https://datalbus.com.br:8000/api/v2/assets',
+      url: baseUrl + '/assets',
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -39,7 +44,7 @@ routerAdd('POST', '/backend/v1/healthcheckDatalbus', (e) => {
         success: false,
         status: 'offline',
         datalbus: false,
-        error: 'Token inválido ou expirado.',
+        error: 'token inválido',
         statusCode: 401,
         timestamp: new Date().toISOString(),
       })
@@ -49,7 +54,7 @@ routerAdd('POST', '/backend/v1/healthcheckDatalbus', (e) => {
       success: false,
       status: 'offline',
       datalbus: false,
-      error: 'Serviço Datalbus indisponível.',
+      error: 'API indisponível',
       statusCode: 503,
       timestamp: new Date().toISOString(),
     })
@@ -58,7 +63,7 @@ routerAdd('POST', '/backend/v1/healthcheckDatalbus', (e) => {
       success: false,
       status: 'offline',
       datalbus: false,
-      error: 'Tempo de requisição esgotado ou serviço indisponível.',
+      error: 'API indisponível',
       statusCode: 503,
       timestamp: new Date().toISOString(),
     })
