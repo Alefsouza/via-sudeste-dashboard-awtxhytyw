@@ -143,16 +143,20 @@ export default function SyncDashboard() {
       })
     } catch (e: any) {
       const duration_ms = Date.now() - start
+      const errorMessage = e.response?.error || e.message || 'Erro desconhecido'
       await createSyncLog({
         type,
         status: 'error',
         records_count: 0,
         duration_ms,
-        error_message: e.message || 'Erro desconhecido',
+        error_message: errorMessage,
       })
       toast({
-        title: 'Erro ao sincronizar. Tente novamente.',
-        description: e.message,
+        title:
+          type === 'events'
+            ? 'Erro ao sincronizar eventos.'
+            : 'Erro ao sincronizar. Tente novamente.',
+        description: errorMessage,
         variant: 'destructive',
       })
     } finally {

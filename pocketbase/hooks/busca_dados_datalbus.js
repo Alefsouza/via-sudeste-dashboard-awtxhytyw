@@ -26,7 +26,7 @@ routerAdd(
       assets: baseUrl + '/assets',
       drivers: baseUrl + '/drivers',
       trips: baseUrl + '/trips',
-      tripEvents: baseUrl + '/trip-events',
+      tripEvents: baseUrl + '/events',
     }
 
     const url = endpoints[action]
