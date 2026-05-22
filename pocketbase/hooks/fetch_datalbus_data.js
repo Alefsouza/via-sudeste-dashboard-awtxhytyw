@@ -1,0 +1,398 @@
+// @deps date-fns@4.1.0, date-fns-tz@3.1.3
+routerAdd('OPTIONS', '/backend/v1/fetchDatalbusData', (e) => {
+  e.response.header().set('Access-Control-Allow-Origin', '*')
+  e.response.header().set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  e.response.header().set('Access-Control-Allow-Headers', 'authorization, apikey, content-type')
+  return e.noContent(204)
+})
+
+routerAdd(
+  'POST',
+  '/backend/v1/fetchDatalbusData',
+  (e) => {
+    const { parseISO } = require('date-fns')
+    const { formatInTimeZone } = require('date-fns-tz')
+
+    const startTime = Date.now()
+
+    const baseUrl = $secrets.get('DATALBUS_BASE_URL')
+    const email = $secrets.get('DATALBUS_EMAIL')
+    const password = $secrets.get('DATALBUS_PASSWORD')
+    const tenancy = $secrets.get('DATALBUS_TENANCY')
+    const xTenancy = $secrets.get('DATALBUS_X_TENANCY')
+
+    if (!baseUrl || !email || !password || !tenancy || !xTenancy) {
+      $app
+        .logger()
+        .error(
+          'Datalbus integration missing secrets',
+          'endpoint',
+          '/backend/v1/fetchDatalbusData',
+          'statusCode',
+          503,
+        )
+      return e.json(503, {
+        success: false,
+        error: 'Serviço Datalbus indisponível',
+        code: 'SERVICE_UNAVAILABLE',
+      })
+    }
+
+    const body = e.requestInfo().body || {}
+    const dataFiltro = body.date
+    if (!dataFiltro) {
+      $app
+        .logger()
+        .error(
+          'Missing date parameter',
+          'endpoint',
+          '/backend/v1/fetchDatalbusData',
+          'statusCode',
+          400,
+        )
+      return e.json(400, {
+        success: false,
+        error: 'Parâmetros obrigatórios faltando',
+        code: 'MISSING_PARAMS',
+      })
+    }
+
+    const sleep = (ms) => {
+      const s = Date.now()
+      while (Date.now() - s < ms) {}
+    }
+
+    const fetchWithRetry = (endpoint, method, headers, reqBody = null) => {
+      let attempt = 0
+      while (attempt <= 3) {
+        try {
+          const url = baseUrl.replace(/\/$/, '') + endpoint
+          const reqOpts = { url, method, headers, timeout: 30 }
+          if (reqBody) {
+            reqOpts.body = JSON.stringify(reqBody)
+          }
+
+          const res = $http.send(reqOpts)
+
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            return { status: res.statusCode, data: res.json }
+          }
+
+          if (res.statusCode === 429 || res.statusCode >= 500) {
+            throw new Error(`HTTP ${res.statusCode}`)
+          } else {
+            return { status: res.statusCode, data: res.json }
+          }
+        } catch (err) {
+          if (attempt === 3) throw err
+          attempt++
+          const sleepMs = Math.pow(2, attempt) * 1000
+          sleep(sleepMs)
+        }
+      }
+    }
+
+    try {
+      // 1. Auth Flow
+      let token = ''
+      try {
+        const cacheRecord = $app.findFirstRecordByData('integration_cache', 'key', 'datalbus_token')
+        const expStr = cacheRecord.getString('expires_at')
+        if (expStr && new Date(expStr).getTime() > Date.now()) {
+          token = cacheRecord.getString('value')
+        }
+      } catch (_) {}
+
+      if (!token) {
+        const loginRes = fetchWithRetry(
+          '/login',
+          'POST',
+          {
+            'Content-Type': 'application/json',
+            tenancy: tenancy,
+          },
+          { email, password },
+        )
+
+        if (loginRes.status === 401) {
+          $app
+            .logger()
+            .error(
+              'Invalid datalbus credentials',
+              'endpoint',
+              '/backend/v1/fetchDatalbusData',
+              'statusCode',
+              401,
+            )
+          return e.json(401, {
+            success: false,
+            error: 'Credenciais inválidas',
+            code: 'INVALID_CREDENTIALS',
+          })
+        }
+
+        if (loginRes.status !== 200 || !loginRes.data || !loginRes.data.token) {
+          $app
+            .logger()
+            .error(
+              'Datalbus login failed',
+              'endpoint',
+              '/backend/v1/fetchDatalbusData',
+              'status',
+              loginRes.status,
+              'statusCode',
+              503,
+            )
+          return e.json(503, {
+            success: false,
+            error: 'Serviço Datalbus indisponível',
+            code: 'SERVICE_UNAVAILABLE',
+          })
+        }
+
+        token = loginRes.data.token
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+        try {
+          const cacheRecord = $app.findFirstRecordByData(
+            'integration_cache',
+            'key',
+            'datalbus_token',
+          )
+          cacheRecord.set('value', token)
+          cacheRecord.set('expires_at', expiresAt)
+          $app.save(cacheRecord)
+        } catch (_) {
+          const col = $app.findCollectionByNameOrId('integration_cache')
+          const newRecord = new Record(col)
+          newRecord.set('key', 'datalbus_token')
+          newRecord.set('value', token)
+          newRecord.set('expires_at', expiresAt)
+          $app.save(newRecord)
+        }
+      }
+
+      const defaultHeaders = {
+        Authorization: `Bearer ${token}`,
+        'x-tenancy': xTenancy,
+        'Content-Type': 'application/json',
+      }
+
+      const fetchAllPages = (endpoint, queryParams = '') => {
+        let allData = []
+        let page = 1
+        while (true) {
+          const sep = endpoint.includes('?') || queryParams.includes('?') ? '&' : '?'
+          const res = fetchWithRetry(
+            `${endpoint}${sep}page=${page}&${queryParams}`,
+            'GET',
+            defaultHeaders,
+          )
+          if (res.status !== 200 || !res.data) break
+
+          const items = res.data.data || res.data || []
+          if (!Array.isArray(items)) break
+
+          allData = allData.concat(items)
+
+          const perPage = res.data.meta?.per_page || 100
+          if (items.length < perPage) break
+          page++
+          if (page > 100) break // safe-guard max 100 pages
+        }
+        return allData
+      }
+
+      // Assets
+      const assetsRes = fetchWithRetry('/assets?per_page=all', 'GET', defaultHeaders)
+      let rawAssets = []
+      if (assetsRes.status === 200 && assetsRes.data) {
+        rawAssets = assetsRes.data.data || assetsRes.data || []
+      }
+
+      // Drivers
+      const rawDrivers = fetchAllPages('/drivers', 'per_page=100')
+
+      // Trips
+      const rawTrips = fetchAllPages('/trips', `date=${dataFiltro}&per_page=100`)
+
+      // Trip Events
+      let rawTripEvents = []
+      for (const trip of rawTrips) {
+        if (trip.id) {
+          const events = fetchAllPages(`/trips/${trip.id}/events`, 'per_page=100')
+          rawTripEvents = rawTripEvents.concat(events)
+        }
+      }
+
+      // Events Schema
+      let rawEventsSchema = []
+      let schemaCached = false
+      try {
+        const cacheRecord = $app.findFirstRecordByData(
+          'integration_cache',
+          'key',
+          'datalbus_schema',
+        )
+        const expStr = cacheRecord.getString('expires_at')
+        if (expStr && new Date(expStr).getTime() > Date.now()) {
+          const val = cacheRecord.getString('value')
+          if (val) {
+            rawEventsSchema = JSON.parse(val)
+            schemaCached = true
+          }
+        }
+      } catch (_) {}
+
+      if (!schemaCached) {
+        const schemaRes = fetchWithRetry('/events-schema?per_page=100', 'GET', defaultHeaders)
+        if (schemaRes.status === 200 && schemaRes.data) {
+          rawEventsSchema = schemaRes.data.data || schemaRes.data || []
+          const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          try {
+            const cacheRecord = $app.findFirstRecordByData(
+              'integration_cache',
+              'key',
+              'datalbus_schema',
+            )
+            cacheRecord.set('value', JSON.stringify(rawEventsSchema))
+            cacheRecord.set('expires_at', expiresAt)
+            $app.save(cacheRecord)
+          } catch (_) {
+            const col = $app.findCollectionByNameOrId('integration_cache')
+            const newRecord = new Record(col)
+            newRecord.set('key', 'datalbus_schema')
+            newRecord.set('value', JSON.stringify(rawEventsSchema))
+            newRecord.set('expires_at', expiresAt)
+            $app.save(newRecord)
+          }
+        }
+      }
+
+      // Normalizations
+      const normalizeDate = (isoStr) => {
+        if (!isoStr) return null
+        try {
+          const d = parseISO(isoStr)
+          return formatInTimeZone(d, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ssXXX")
+        } catch (e) {
+          return isoStr
+        }
+      }
+
+      const assets = rawAssets.map((a) => ({
+        ...a,
+        asset_id: a.asset_id ? parseInt(a.asset_id, 10) : null,
+        license_plate: a.license_plate === null ? '' : a.license_plate,
+      }))
+
+      const drivers = rawDrivers.map((d) => ({ ...d }))
+
+      const trips = rawTrips.map((t) => ({
+        ...t,
+        start_time: normalizeDate(t.start_time),
+        end_time: normalizeDate(t.end_time),
+      }))
+
+      const tripEvents = rawTripEvents.map((e) => ({
+        ...e,
+        latitude: e.latitude ? parseFloat(e.latitude) : null,
+        longitude: e.longitude ? parseFloat(e.longitude) : null,
+        event_time: normalizeDate(e.event_time),
+      }))
+
+      const eventsByDesc = {}
+      for (const e of tripEvents) {
+        const desc = e.event_type_description || 'Unknown'
+        eventsByDesc[desc] = (eventsByDesc[desc] || 0) + 1
+      }
+
+      const eventsByGarage = {}
+      const assetGroupMap = {}
+      for (const a of assets) {
+        if (a.id) assetGroupMap[a.id] = a.asset_group || 'Unknown'
+      }
+      for (const e of tripEvents) {
+        const garage =
+          e.asset_id && assetGroupMap[e.asset_id] ? assetGroupMap[e.asset_id] : 'Unknown'
+        eventsByGarage[garage] = (eventsByGarage[garage] || 0) + 1
+      }
+
+      // Previous period variation
+      let prevTripEvents = []
+      try {
+        const prevDateObj = new Date(new Date(dataFiltro).getTime() - 24 * 60 * 60 * 1000)
+        const prevDateFiltro = prevDateObj.toISOString().split('T')[0]
+        const rawPrevTrips = fetchAllPages('/trips', `date=${prevDateFiltro}&per_page=100`)
+
+        for (const trip of rawPrevTrips) {
+          if (trip.id) {
+            const events = fetchAllPages(`/trips/${trip.id}/events`, 'per_page=100')
+            prevTripEvents = prevTripEvents.concat(events)
+          }
+        }
+      } catch (_) {}
+
+      const currTotal = tripEvents.length
+      const prevTotal = prevTripEvents.length
+      let eventsVariationPercent = 0
+      if (prevTotal > 0) {
+        eventsVariationPercent = ((currTotal - prevTotal) / prevTotal) * 100
+      } else if (currTotal > 0) {
+        eventsVariationPercent = 100
+      }
+
+      const duration = Date.now() - startTime
+      $app
+        .logger()
+        .info(
+          'Datalbus fetch success',
+          'endpoint',
+          '/backend/v1/fetchDatalbusData',
+          'durationMs',
+          duration,
+          'date',
+          dataFiltro,
+        )
+
+      return e.json(200, {
+        success: true,
+        data: {
+          assets,
+          drivers,
+          trips,
+          tripEvents,
+          eventsSchema: rawEventsSchema,
+          aggregations: {
+            eventsByDescription: eventsByDesc,
+            eventsByGarage,
+            eventsVariationPercent,
+          },
+        },
+        timestamp: new Date().toISOString(),
+        period: { start: dataFiltro, end: dataFiltro },
+      })
+    } catch (err) {
+      const duration = Date.now() - startTime
+      $app
+        .logger()
+        .error(
+          'Datalbus fetch error',
+          'endpoint',
+          '/backend/v1/fetchDatalbusData',
+          'error',
+          err.message,
+          'durationMs',
+          duration,
+          'statusCode',
+          500,
+        )
+      return e.json(500, {
+        success: false,
+        error: 'Erro interno no processamento',
+        code: 'INTERNAL_ERROR',
+      })
+    }
+  },
+  $apis.requireAuth(),
+)
