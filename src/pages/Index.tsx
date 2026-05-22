@@ -154,12 +154,16 @@ export default function Index() {
       try {
         const healthAbort = new AbortController()
         const healthTimeout = setTimeout(() => healthAbort.abort(), 10000)
-        const healthRes = await pb.send('/backend/v1/fetchDatalbusData/healthcheck', {
+        const healthRes = await pb.send('/backend/v1/datalbus_healthcheck', {
           method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
           signal: healthAbort.signal as any,
         })
         clearTimeout(healthTimeout)
-        if (!healthRes || healthRes.status !== 'ok') {
+        if (
+          !healthRes ||
+          (!healthRes.success && healthRes.status !== 'ok' && healthRes.datalbus !== 'ok')
+        ) {
           throw new Error('HEALTH_FAILED')
         }
       } catch (e: any) {
