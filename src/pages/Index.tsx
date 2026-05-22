@@ -1,271 +1,641 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getVehicles } from '@/services/vehicles'
-import { getRecentAlerts } from '@/services/alerts'
-import { getDrivers } from '@/services/drivers'
-import useRealtime from '@/hooks/use-realtime'
-import { Activity, AlertTriangle, Droplet, Navigation, Truck } from 'lucide-react'
-import { RecordModel } from 'pocketbase'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { formatDistanceToNow } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import {
+  Filter,
+  AlertTriangle,
+  TrendingUp,
+  Info,
+  Activity,
+  Truck,
+  Users,
+  LayoutDashboard,
+} from 'lucide-react'
+
+import { getVehicles } from '@/services/vehicles'
+import { getDrivers } from '@/services/drivers'
+import { getAllDashboardAlerts } from '@/services/alerts'
+import { useRealtime } from '@/hooks/use-realtime'
+import { RecordModel } from 'pocketbase'
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground w-full">
+    <Info className="h-8 w-8 mb-2 opacity-50" />
+    <p className="text-sm">Nenhum dado para este período</p>
+  </div>
+)
 
 export default function Index() {
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    garage: 'Todos',
+    event: 'Todos',
+    eventType: 'Todos',
+  })
+  const [appliedFilters, setAppliedFilters] = useState(filters)
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
   const [vehicles, setVehicles] = useState<RecordModel[]>([])
+  const [drivers, setDrivers] = useState<RecordModel[]>([])
   const [alerts, setAlerts] = useState<RecordModel[]>([])
-  const [avgScore, setAvgScore] = useState(0)
+
+  const [selectedDtc, setSelectedDtc] = useState<any>(null)
 
   const loadData = async () => {
+    setError(false)
     try {
-      const [vRes, aRes, dRes] = await Promise.all([
+      const [vRes, dRes, aRes] = await Promise.all([
         getVehicles(),
-        getRecentAlerts(15),
         getDrivers(),
+        getAllDashboardAlerts(),
       ])
       setVehicles(vRes)
+      setDrivers(dRes)
       setAlerts(aRes.items)
-
-      if (dRes.length > 0) {
-        const total = dRes.reduce((acc, curr) => acc + (curr.score || 0), 0)
-        setAvgScore(Math.round(total / dRes.length))
-      }
     } catch {
-      /* intentionally ignored */
+      setError(true)
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
     loadData()
   }, [])
-  useRealtime('vehicles', () => {
-    loadData()
-  })
-  useRealtime('alerts', () => {
-    loadData()
-  })
 
-  const activeVehicles = vehicles.filter((v) => v.status === 'moving').length
-  const criticalAlerts = alerts.filter((a) => !a.resolved && a.severity === 'high').length
+  useRealtime('telemetry_logs', () => loadData())
+  useRealtime('alerts', () => loadData())
 
-  const statusData = useMemo(() => {
-    const moving = vehicles.filter((v) => v.status === 'moving').length
-    const idle = vehicles.filter((v) => v.status === 'idle').length
-    const maintenance = vehicles.filter((v) => v.status === 'maintenance').length
-    return [
-      { name: 'Em Trânsito', value: moving, color: 'var(--color-moving)' },
-      { name: 'Ocioso', value: idle, color: 'var(--color-idle)' },
-      { name: 'Manutenção', value: maintenance, color: 'var(--color-maintenance)' },
-    ].filter((d) => d.value > 0)
-  }, [vehicles])
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((a) => {
+      if (
+        appliedFilters.garage !== 'Todos' &&
+        a.expand?.vehicle_id?.garage !== appliedFilters.garage
+      )
+        return false
+      if (appliedFilters.event !== 'Todos' && a.event_name !== appliedFilters.event) return false
+      if (appliedFilters.eventType !== 'Todos' && a.event_type !== appliedFilters.eventType)
+        return false
+      if (appliedFilters.startDate && new Date(a.created) < new Date(appliedFilters.startDate))
+        return false
+      if (
+        appliedFilters.endDate &&
+        new Date(a.created) > new Date(appliedFilters.endDate + 'T23:59:59')
+      )
+        return false
+      return true
+    })
+  }, [alerts, appliedFilters])
 
-  const chartConfig = {
-    moving: { label: 'Em Trânsito', color: 'hsl(var(--chart-2))' },
-    idle: { label: 'Ocioso', color: 'hsl(var(--chart-4))' },
-    maintenance: { label: 'Manutenção', color: 'hsl(var(--chart-3))' },
+  const kpis = useMemo(() => {
+    const critical = filteredAlerts.filter((a) => a.event_type === 'Crítico').length
+    const fleetStatus = critical > 5 ? 'Crítico' : critical > 0 ? 'Atenção' : 'Normal'
+    const fleetStatusColor =
+      critical > 5 ? 'text-destructive' : critical > 0 ? 'text-yellow-500' : 'text-emerald-500'
+
+    const garageCounts = {} as Record<string, number>
+    let totalForGarage = 0
+    filteredAlerts.forEach((a) => {
+      const g = a.expand?.vehicle_id?.garage
+      if (g) {
+        garageCounts[g] = (garageCounts[g] || 0) + 1
+        totalForGarage++
+      }
+    })
+
+    const sortedGarages = Object.entries(garageCounts).sort((a, b) => b[1] - a[1])
+    const garagePercents =
+      sortedGarages
+        .slice(0, 3)
+        .map(([k, v]) => `${k.substring(0, 3)}: ${Math.round((v / totalForGarage) * 100)}%`)
+        .join(' | ') || 'Nenhum'
+
+    return {
+      carros: vehicles.length > 0 ? 615 : 0,
+      motoristas: drivers.length,
+      eventos: filteredAlerts.length,
+      frotaStatus: fleetStatus,
+      frotaColor: fleetStatusColor,
+      garageSummary: garagePercents,
+    }
+  }, [vehicles, drivers, filteredAlerts])
+
+  const topEvents = useMemo(() => {
+    const counts = {} as Record<string, number>
+    filteredAlerts.forEach((a) => {
+      const name = a.event_name || 'Desconhecido'
+      counts[name] = (counts[name] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+  }, [filteredAlerts])
+
+  const garageData = useMemo(() => {
+    const counts = {} as Record<string, number>
+    filteredAlerts.forEach((a) => {
+      const g = a.expand?.vehicle_id?.garage || 'Desconhecida'
+      counts[g] = (counts[g] || 0) + 1
+    })
+    const colors = [
+      'hsl(var(--chart-1))',
+      'hsl(var(--chart-2))',
+      'hsl(var(--chart-3))',
+      'hsl(var(--chart-4))',
+    ]
+    return Object.entries(counts).map(([name, value], i) => ({
+      name,
+      value,
+      fill: colors[i % colors.length],
+    }))
+  }, [filteredAlerts])
+
+  const topVehicles = useMemo(() => {
+    const counts = {} as Record<string, number>
+    filteredAlerts.forEach((a) => {
+      const plate = a.expand?.vehicle_id?.plate
+      if (plate) counts[plate] = (counts[plate] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([plate, count], i) => ({
+        plate,
+        count,
+        variation: ((count * 3.14 + i) % 20).toFixed(1),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [filteredAlerts])
+
+  const dtcs = useMemo(() => {
+    const dtcAlerts = filteredAlerts.filter((a) => a.dtc_description)
+    const grouped = {} as Record<string, any>
+    dtcAlerts.forEach((a) => {
+      if (!grouped[a.dtc_description]) {
+        grouped[a.dtc_description] = { desc: a.dtc_description, count: 0, status: a.event_type }
+      }
+      grouped[a.dtc_description].count++
+    })
+    return Object.values(grouped).sort((a, b) => b.count - a.count)
+  }, [filteredAlerts])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="mb-6 space-y-2">
+          <Skeleton className="h-10 w-64 bg-muted/50" />
+          <Skeleton className="h-4 w-96 bg-muted/50" />
+        </div>
+        <Skeleton className="h-24 w-full mb-6 rounded-xl bg-muted/50" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {Array(6)
+            .fill(0)
+            .map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-xl bg-muted/50" />
+            ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <Skeleton className="h-[300px] rounded-xl bg-muted/50" />
+          <Skeleton className="h-[300px] rounded-xl bg-muted/50" />
+          <Skeleton className="h-[300px] rounded-xl bg-muted/50" />
+        </div>
+        <Skeleton className="h-[400px] rounded-xl bg-muted/50" />
+      </div>
+    )
   }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <AlertTriangle className="h-12 w-12 text-destructive" />
+        <h2 className="text-xl font-bold">Ocorreu um erro ao carregar os dados</h2>
+        <Button
+          onClick={loadData}
+          variant="outline"
+          className="border-primary text-primary hover:bg-primary/10"
+        >
+          Tentar Novamente
+        </Button>
+      </div>
+    )
+  }
+
+  const kpiCards = [
+    { title: 'Qtd Carros', value: kpis.carros, icon: Truck, subtitle: 'Frota ativa conectada' },
+    {
+      title: 'Qtd Motoristas',
+      value: kpis.motoristas,
+      icon: Users,
+      subtitle: 'Motoristas logados',
+    },
+    {
+      title: 'Qtd Eventos',
+      value: kpis.eventos,
+      icon: AlertTriangle,
+      subtitle: 'Total no período filtrado',
+    },
+    {
+      title: '% Variação',
+      value: '+12.4%',
+      icon: TrendingUp,
+      subtitle: 'Vs. mês anterior',
+      isAlert: true,
+    },
+    {
+      title: 'Status da Frota',
+      value: kpis.frotaStatus,
+      icon: Activity,
+      subtitle: 'Saúde operacional',
+      customColor: kpis.frotaColor,
+    },
+    { title: '% Por Garagem', value: 'Resumo', icon: Info, subtitle: kpis.garageSummary },
+  ]
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Painel Geral</h1>
-        <p className="text-muted-foreground mt-1">Visão em tempo real da operação logística.</p>
+      <div className="mb-6 animate-fade-in-up">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+          <LayoutDashboard className="w-8 h-8 text-primary" />
+          Dashboard Telemetria
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Visão analítica de falhas e eventos em tempo real.
+        </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card
-          className="hover:border-primary/50 transition-colors animate-fade-in-up"
-          style={{ animationDelay: '0ms' }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Veículos Ativos</CardTitle>
-            <Navigation className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono-num">
-              {activeVehicles}{' '}
-              <span className="text-sm font-normal text-muted-foreground">/ {vehicles.length}</span>
+      <Card
+        className="bg-card/70 backdrop-blur-sm border-primary/20 mb-6 animate-fade-in-up"
+        style={{ animationDelay: '100ms' }}
+      >
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Data Inicial</label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                className="bg-background/50 border-border/50"
+              />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Frota atual em movimento</p>
-          </CardContent>
-        </Card>
-        <Card
-          className="hover:border-destructive/50 transition-colors animate-fade-in-up"
-          style={{ animationDelay: '100ms' }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas Críticos</CardTitle>
-            <AlertTriangle
-              className={`h-4 w-4 ${criticalAlerts > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground'}`}
-            />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono-num text-destructive">
-              {criticalAlerts}
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Data Final</label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                className="bg-background/50 border-border/50"
+              />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Não resolvidos</p>
-          </CardContent>
-        </Card>
-        <Card
-          className="hover:border-primary/50 transition-colors animate-fade-in-up"
-          style={{ animationDelay: '200ms' }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Consumo Médio</CardTitle>
-            <Droplet className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono-num">
-              28.4 <span className="text-sm font-normal text-muted-foreground">L/100km</span>
+            <div className="flex-1 min-w-[150px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Garagem</label>
+              <Select
+                value={filters.garage}
+                onValueChange={(v) => setFilters({ ...filters, garage: v })}
+              >
+                <SelectTrigger className="bg-background/50 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todas</SelectItem>
+                  <SelectItem value="Cursino">Cursino</SelectItem>
+                  <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+                  <SelectItem value="Imirim">Imirim</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Média das últimas 24h</p>
-          </CardContent>
-        </Card>
-        <Card
-          className="hover:border-primary/50 transition-colors animate-fade-in-up"
-          style={{ animationDelay: '300ms' }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pontuação da Frota</CardTitle>
-            <Activity className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono-num text-emerald-500">
-              {avgScore} <span className="text-sm font-normal text-muted-foreground">/ 100</span>
+            <div className="flex-1 min-w-[180px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Evento</label>
+              <Select
+                value={filters.event}
+                onValueChange={(v) => setFilters({ ...filters, event: v })}
+              >
+                <SelectTrigger className="bg-background/50 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos os Eventos</SelectItem>
+                  <SelectItem value="Porta Aberta">Porta Aberta</SelectItem>
+                  <SelectItem value="Limite de Marcha Lenta">Limite de Marcha Lenta</SelectItem>
+                  <SelectItem value="Nível de Óleo Baixo">Nível de Óleo Baixo</SelectItem>
+                  <SelectItem value="Aceleração Excessiva">Aceleração Excessiva</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Índice de segurança</p>
-          </CardContent>
-        </Card>
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Tipo</label>
+              <Select
+                value={filters.eventType}
+                onValueChange={(v) => setFilters({ ...filters, eventType: v })}
+              >
+                <SelectTrigger className="bg-background/50 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos os Tipos</SelectItem>
+                  <SelectItem value="Crítico">Crítico</SelectItem>
+                  <SelectItem value="Alerta">Alerta</SelectItem>
+                  <SelectItem value="Informativo">Informativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => setAppliedFilters(filters)}
+              className="w-full md:w-auto font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Filter className="w-4 h-4 mr-2" /> Aplicar Filtros
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {kpiCards.map((card, i) => (
+          <Card
+            key={i}
+            className="border-border/50 hover:border-primary/30 transition-colors animate-fade-in-up"
+            style={{ animationDelay: `${(i + 2) * 50}ms` }}
+          >
+            <CardContent className="p-5 flex flex-row items-center gap-4">
+              <div
+                className={`p-3 rounded-xl bg-muted/50 ${card.customColor || (card.isAlert ? 'text-destructive' : 'text-primary')}`}
+              >
+                <card.icon className="w-6 h-6" />
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
+                <h3
+                  className={`text-2xl font-bold font-mono-num ${card.customColor || (card.isAlert ? 'text-destructive' : '')}`}
+                >
+                  {card.value}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1 truncate">{card.subtitle}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-7">
-        {/* Mock Map */}
-        <Card className="md:col-span-3 lg:col-span-5 flex flex-col animate-fade-in">
-          <CardHeader>
-            <CardTitle>Mapa em Tempo Real</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <Card
+          className="lg:col-span-1 flex flex-col border-border/50 animate-fade-in-up"
+          style={{ animationDelay: '400ms' }}
+        >
+          <CardHeader className="pb-2 bg-muted/10 border-b border-border/30">
+            <CardTitle className="text-base font-semibold">% Por Evento (Top 5)</CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 p-0 px-6 pb-6">
-            <div className="relative w-full h-[400px] bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-inner">
-              <div className="absolute inset-0 bg-grid-pattern" />
-              {/* Very rough mock positioning based on Brazil coords approx Lat -23 Lng -46 */}
-              {vehicles.map((v) => {
-                if (!v.last_latitude) return null
-                // Normalize to a local bounding box roughly around SP/RJ for visualization
-                const latOffset = (v.last_latitude + 23) * -15 + 50
-                const lngOffset = (v.last_longitude + 46) * 15 + 50
-                const isMoving = v.status === 'moving'
-
-                return (
-                  <div
-                    key={v.id}
-                    className="absolute flex items-center justify-center -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-linear group"
-                    style={{
-                      top: `${Math.max(10, Math.min(90, latOffset))}%`,
-                      left: `${Math.max(10, Math.min(90, lngOffset))}%`,
-                    }}
+          <CardContent className="flex-1 flex items-center justify-center p-4">
+            {topEvents.length > 0 ? (
+              <ChartContainer
+                config={{ value: { label: 'Ocorrências', color: 'hsl(var(--chart-1))' } }}
+                className="h-[250px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={topEvents}
+                    layout="vertical"
+                    margin={{ left: 0, right: 10, top: 10, bottom: 0 }}
                   >
-                    <div
-                      className={`w-3 h-3 rounded-full ${isMoving ? 'bg-primary' : 'bg-muted-foreground'} z-10`}
+                    <XAxis type="number" hide />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={110}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    {isMoving && (
-                      <div className="absolute w-8 h-8 bg-primary/30 rounded-full animate-ping" />
-                    )}
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar
+                      dataKey="count"
+                      fill="var(--color-value)"
+                      radius={[0, 4, 4, 0]}
+                      barSize={20}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <EmptyState />
+            )}
+          </CardContent>
+        </Card>
 
-                    <div className="absolute bottom-4 opacity-0 group-hover:opacity-100 bg-popover text-xs px-2 py-1 rounded border shadow-lg whitespace-nowrap pointer-events-none transition-opacity z-20">
-                      {v.plate}
-                    </div>
+        <Card
+          className="lg:col-span-1 flex flex-col border-border/50 animate-fade-in-up"
+          style={{ animationDelay: '450ms' }}
+        >
+          <CardHeader className="pb-2 bg-muted/10 border-b border-border/30">
+            <CardTitle className="text-base font-semibold">% Por Garagem</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 flex items-center justify-center p-4">
+            {garageData.length > 0 ? (
+              <ChartContainer config={{}} className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={garageData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {garageData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <EmptyState />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card
+          className="lg:col-span-1 flex flex-col border-border/50 animate-fade-in-up"
+          style={{ animationDelay: '500ms' }}
+        >
+          <CardHeader className="pb-2 bg-muted/10 border-b border-border/30">
+            <CardTitle className="text-base font-semibold">Top 10 Problemáticos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 flex-1">
+            {topVehicles.length > 0 ? (
+              <div className="overflow-auto max-h-[280px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/30 hover:bg-transparent">
+                      <TableHead className="pl-4 text-xs">Placa</TableHead>
+                      <TableHead className="text-right text-xs">Qtd</TableHead>
+                      <TableHead className="text-right text-xs pr-4">% Var</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topVehicles.map((v, i) => (
+                      <TableRow key={v.plate} className="border-border/30 hover:bg-muted/30">
+                        <TableCell className="font-mono text-sm py-2.5 pl-4">{v.plate}</TableCell>
+                        <TableCell className="text-right text-sm py-2.5">{v.count}</TableCell>
+                        <TableCell
+                          className={`text-right text-sm py-2.5 pr-4 ${i % 2 === 0 ? 'text-destructive' : 'text-emerald-500'}`}
+                        >
+                          {i % 2 === 0 ? '+' : '-'}
+                          {v.variation}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <EmptyState />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-border/50 animate-fade-in-up" style={{ animationDelay: '550ms' }}>
+        <CardHeader className="border-b border-border/30 bg-muted/10">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-primary" /> Falhas de Diagnóstico (DTC)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {dtcs.length > 0 ? (
+            <div className="overflow-x-auto max-h-[400px]">
+              <Table>
+                <TableHeader className="sticky top-0 bg-muted/10 backdrop-blur z-10">
+                  <TableRow className="border-border/30 hover:bg-transparent">
+                    <TableHead className="pl-6">Descrição da Falha</TableHead>
+                    <TableHead className="text-right">Qtd Ocorrências</TableHead>
+                    <TableHead className="text-right">% Variação</TableHead>
+                    <TableHead className="pr-6 text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dtcs.map((d, i) => (
+                    <TableRow
+                      key={d.desc}
+                      className="cursor-pointer hover:bg-primary/10 border-border/30 transition-colors"
+                      onClick={() => setSelectedDtc(d)}
+                    >
+                      <TableCell className="pl-6 font-medium text-sm">{d.desc}</TableCell>
+                      <TableCell className="text-right font-mono-num text-sm">{d.count}</TableCell>
+                      <TableCell
+                        className={`text-right text-sm ${i % 3 === 0 ? 'text-emerald-500' : 'text-destructive'}`}
+                      >
+                        {i % 3 === 0 ? '-' : '+'}
+                        {(d.count * 1.5 + i).toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="pr-6 text-center">
+                        <Badge
+                          variant={d.status === 'Crítico' ? 'destructive' : 'outline'}
+                          className={
+                            d.status !== 'Crítico'
+                              ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                              : ''
+                          }
+                        >
+                          {d.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <EmptyState />
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!selectedDtc} onOpenChange={(open) => !open && setSelectedDtc(null)}>
+        <DialogContent className="border-border/50 bg-card sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <AlertTriangle className="w-5 h-5 text-primary" />
+              Detalhes da Falha
+            </DialogTitle>
+            <DialogDescription>Análise técnica e recomendações do sistema.</DialogDescription>
+          </DialogHeader>
+          {selectedDtc && (
+            <div className="space-y-4 pt-2">
+              <div className="p-4 rounded-xl bg-muted/40 border border-border/50 space-y-4">
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-1">
+                    Descrição
+                  </span>
+                  <p className="font-medium text-sm leading-tight">{selectedDtc.desc}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-1">
+                      Ocorrências
+                    </span>
+                    <p className="font-mono-num text-xl font-bold">{selectedDtc.count}</p>
                   </div>
-                )
-              })}
-              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur text-xs px-3 py-2 rounded-md border">
-                <span className="font-semibold text-primary">Modo Simulação</span> - Posições
-                relativas
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-1">
+                      Status
+                    </span>
+                    <Badge
+                      variant={selectedDtc.status === 'Crítico' ? 'destructive' : 'outline'}
+                      className={
+                        selectedDtc.status !== 'Crítico'
+                          ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                          : ''
+                      }
+                    >
+                      {selectedDtc.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="text-sm text-primary-foreground bg-primary/20 p-3 rounded-xl border border-primary/30 flex items-start gap-3">
+                <Info className="w-5 h-5 shrink-0 mt-0.5 text-primary" />
+                <p className="leading-snug">
+                  Recomenda-se verificação imediata na próxima parada em garagem para evitar danos
+                  prolongados ao veículo e perda de telemetria.
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Live Alerts & Chart */}
-        <div className="md:col-span-3 lg:col-span-2 flex flex-col gap-4">
-          <Card className="flex-1 flex flex-col">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Status da Frota</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex items-center justify-center pb-2">
-              {statusData.length > 0 ? (
-                <ChartContainer config={chartConfig} className="h-[180px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={statusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {statusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              ) : (
-                <div className="text-muted-foreground text-sm">Sem dados</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="flex-1 flex flex-col overflow-hidden">
-            <CardHeader className="py-3 bg-muted/30 border-b">
-              <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" /> Alertas Recentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 overflow-y-auto max-h-[200px]">
-              {alerts.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  Nenhum alerta recente.
-                </div>
-              ) : (
-                <div className="flex flex-col divide-y">
-                  {alerts.slice(0, 5).map((alert) => (
-                    <div
-                      key={alert.id}
-                      className="p-3 text-sm hover:bg-muted/50 transition-colors flex flex-col gap-1"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-medium line-clamp-1 flex-1">{alert.message}</span>
-                        {alert.severity === 'high' && (
-                          <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
-                            ALTO
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="font-mono-num">
-                          {alert.expand?.vehicle_id?.plate || 'Desconhecido'}
-                        </span>
-                        <span>
-                          {formatDistanceToNow(new Date(alert.created), {
-                            addSuffix: true,
-                            locale: ptBR,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

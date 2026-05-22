@@ -1,94 +1,97 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Enforcing dark theme as default for the logistics dashboard */
-    --background: 222.2 47.4% 11.2%; /* Slate 900 */
+    --background: 222 37% 17%;
     --foreground: 210 40% 98%;
-
-    --card: 215 27.9% 16.9%; /* Slate 800 */
+    --card: 222 37% 14%;
     --card-foreground: 210 40% 98%;
-
-    --popover: 215 27.9% 16.9%;
+    --popover: 222 37% 14%;
     --popover-foreground: 210 40% 98%;
-
-    --primary: 24.6 95% 53.1%; /* Via Sudeste Orange */
+    --primary: 28 80% 52%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 217.2 32.6% 25%;
+    --muted-foreground: 215 20.2% 75%;
+    --accent: 28 80% 52%;
     --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 50.6%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 24.6 95% 53.1%;
-
+    --border: 217.2 32.6% 30%;
+    --input: 217.2 32.6% 30%;
+    --ring: 28 80% 52%;
     --radius: 0.5rem;
 
-    --sidebar-background: 222.2 47.4% 11.2%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 24.6 95% 53.1%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 24.6 95% 53.1%;
-
-    --chart-1: 24.6 95% 53.1%; /* Orange */
-    --chart-2: 142.1 76.2% 36.3%; /* Emerald */
-    --chart-3: 0 84.2% 60.2%; /* Red */
-    --chart-4: 217.2 91.2% 59.8%; /* Blue */
-    --chart-5: 47.9 95.8% 53.1%; /* Yellow */
+    --chart-1: 28 80% 52%;
+    --chart-2: 210 100% 60%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 348 83% 55%;
+    --chart-5: 271 81% 65%;
   }
 
+  .dark {
+    --background: 222 37% 17%;
+    --foreground: 210 40% 98%;
+    --card: 222 37% 14%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 37% 14%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 28 80% 52%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 25%;
+    --muted-foreground: 215 20.2% 75%;
+    --accent: 28 80% 52%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 30%;
+    --input: 217.2 32.6% 30%;
+    --ring: 28 80% 52%;
+    --chart-1: 28 80% 52%;
+    --chart-2: 210 100% 60%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 348 83% 55%;
+    --chart-5: 271 81% 65%;
+  }
+}
+
+@layer base {
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
   }
 }
 
 @layer utilities {
-  .font-mono-num {
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums;
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
   }
-
-  .bg-grid-pattern {
-    background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
-    background-size: 40px 40px;
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out forwards;
   }
-
-  @keyframes pulse-ring {
-    0% {
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
     }
-    70% {
-      box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-    }
-    100% {
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    to {
+      opacity: 1;
     }
   }
-
-  .animate-pulse-ring {
-    animation: pulse-ring 2s infinite;
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
