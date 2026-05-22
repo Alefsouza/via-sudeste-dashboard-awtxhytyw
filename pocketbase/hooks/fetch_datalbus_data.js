@@ -29,7 +29,7 @@ routerAdd(
         )
       return e.json(503, {
         success: false,
-        error: 'Serviço Datalbus indisponível',
+        error: 'Serviço Datalbus indisponível (configuração pendente)',
         code: 'SERVICE_UNAVAILABLE',
       })
     }
@@ -56,6 +56,22 @@ routerAdd(
 
     const start = new Date(startDate)
     const end = new Date(endDate)
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return e.json(400, {
+        success: false,
+        error: 'Formato de data inválido (esperado YYYY-MM-DD)',
+        code: 'INVALID_DATE_FORMAT',
+      })
+    }
+
+    if (start > end) {
+      return e.json(400, {
+        success: false,
+        error: 'Data inicial não pode ser maior que data final',
+        code: 'INVALID_DATE_RANGE',
+      })
+    }
+
     const MAX_DAYS = 15
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -95,7 +111,12 @@ routerAdd(
             return { status: res.statusCode, data: res.json }
           }
         } catch (err) {
-          if (attempt === 3) throw err
+          if (attempt === 3) {
+            $app
+              .logger()
+              .warn('Datalbus API retries exhausted', 'endpoint', endpoint, 'error', err.message)
+            return { status: 503, data: null, error: err.message }
+          }
           attempt++
           const sleepMs = Math.pow(2, attempt) * 1000
           sleep(sleepMs)
@@ -174,12 +195,16 @@ routerAdd(
           cacheRecord.set('expires_at', expiresAt)
           $app.save(cacheRecord)
         } catch (_) {
-          const col = $app.findCollectionByNameOrId('integration_cache')
-          const newRecord = new Record(col)
-          newRecord.set('key', 'datalbus_token')
-          newRecord.set('value', token)
-          newRecord.set('expires_at', expiresAt)
-          $app.save(newRecord)
+          try {
+            const col = $app.findCollectionByNameOrId('integration_cache')
+            const newRecord = new Record(col)
+            newRecord.set('key', 'datalbus_token')
+            newRecord.set('value', token)
+            newRecord.set('expires_at', expiresAt)
+            $app.save(newRecord)
+          } catch (errCache) {
+            $app.logger().warn('Failed to save datalbus_token cache', 'error', errCache.message)
+          }
         }
       }
 
@@ -199,14 +224,16 @@ routerAdd(
             'GET',
             defaultHeaders,
           )
-          if (res.status !== 200 || !res.data) break
 
-          const items = res.data.data || res.data || []
+          if (res.status === 401) throw new Error('DATALBUS_UNAUTHORIZED')
+          if (res.status !== 200) throw new Error(`DATALBUS_API_ERROR:${res.status}`)
+
+          const items = res.data?.data || res.data || []
           if (!Array.isArray(items)) break
 
           allData = allData.concat(items)
 
-          const perPage = res.data.meta?.per_page || 100
+          const perPage = res.data?.meta?.per_page || 100
           if (items.length < perPage) break
           page++
           if (page > 100) break // safe-guard max 100 pages
@@ -216,9 +243,16 @@ routerAdd(
 
       // Assets
       const assetsRes = fetchWithRetry('/assets?per_page=all', 'GET', defaultHeaders)
+      if (assetsRes.status === 401) throw new Error('DATALBUS_UNAUTHORIZED')
+      if (assetsRes.status !== 200) throw new Error(`DATALBUS_API_ERROR:${assetsRes.status}`)
+
       let rawAssets = []
-      if (assetsRes.status === 200 && assetsRes.data) {
-        rawAssets = assetsRes.data.data || assetsRes.data || []
+      if (assetsRes.data) {
+        rawAssets = Array.isArray(assetsRes.data.data)
+          ? assetsRes.data.data
+          : Array.isArray(assetsRes.data)
+            ? assetsRes.data
+            : []
       }
 
       // Drivers
@@ -235,7 +269,7 @@ routerAdd(
       // Trip Events
       let rawTripEvents = []
       for (const trip of rawTrips) {
-        if (trip.id) {
+        if (trip && typeof trip === 'object' && trip.id) {
           const events = fetchAllPages(`/trips/${trip.id}/events`, 'per_page=100')
           rawTripEvents = rawTripEvents.concat(events)
         }
@@ -262,8 +296,14 @@ routerAdd(
 
       if (!schemaCached) {
         const schemaRes = fetchWithRetry('/events-schema?per_page=100', 'GET', defaultHeaders)
+        if (schemaRes.status === 401) throw new Error('DATALBUS_UNAUTHORIZED')
         if (schemaRes.status === 200 && schemaRes.data) {
-          rawEventsSchema = schemaRes.data.data || schemaRes.data || []
+          rawEventsSchema = Array.isArray(schemaRes.data.data)
+            ? schemaRes.data.data
+            : Array.isArray(schemaRes.data)
+              ? schemaRes.data
+              : []
+
           const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
           try {
             const cacheRecord = $app.findFirstRecordByData(
@@ -275,12 +315,16 @@ routerAdd(
             cacheRecord.set('expires_at', expiresAt)
             $app.save(cacheRecord)
           } catch (_) {
-            const col = $app.findCollectionByNameOrId('integration_cache')
-            const newRecord = new Record(col)
-            newRecord.set('key', 'datalbus_schema')
-            newRecord.set('value', JSON.stringify(rawEventsSchema))
-            newRecord.set('expires_at', expiresAt)
-            $app.save(newRecord)
+            try {
+              const col = $app.findCollectionByNameOrId('integration_cache')
+              const newRecord = new Record(col)
+              newRecord.set('key', 'datalbus_schema')
+              newRecord.set('value', JSON.stringify(rawEventsSchema))
+              newRecord.set('expires_at', expiresAt)
+              $app.save(newRecord)
+            } catch (errCache) {
+              $app.logger().warn('Failed to save datalbus_schema cache', 'error', errCache.message)
+            }
           }
         }
       }
@@ -304,26 +348,46 @@ routerAdd(
         }
       }
 
-      const assets = rawAssets.map((a) => ({
-        ...a,
-        asset_id: a.asset_id ? parseInt(a.asset_id, 10) : null,
-        license_plate: a.license_plate === null ? '' : a.license_plate,
-      }))
+      const assets = rawAssets
+        .map((a) => {
+          if (!a || typeof a !== 'object') return null
+          return {
+            ...a,
+            asset_id: a.asset_id ? parseInt(a.asset_id, 10) : null,
+            license_plate: a.license_plate === null ? '' : a.license_plate,
+          }
+        })
+        .filter(Boolean)
 
-      const drivers = rawDrivers.map((d) => ({ ...d }))
+      const drivers = rawDrivers
+        .map((d) => {
+          if (!d || typeof d !== 'object') return null
+          return { ...d }
+        })
+        .filter(Boolean)
 
-      const trips = rawTrips.map((t) => ({
-        ...t,
-        start_time: normalizeDate(t.start_time),
-        end_time: normalizeDate(t.end_time),
-      }))
+      const trips = rawTrips
+        .map((t) => {
+          if (!t || typeof t !== 'object') return null
+          return {
+            ...t,
+            start_time: normalizeDate(t.start_time),
+            end_time: normalizeDate(t.end_time),
+          }
+        })
+        .filter(Boolean)
 
-      const tripEvents = rawTripEvents.map((e) => ({
-        ...e,
-        latitude: e.latitude ? parseFloat(e.latitude) : null,
-        longitude: e.longitude ? parseFloat(e.longitude) : null,
-        event_time: normalizeDate(e.event_time),
-      }))
+      const tripEvents = rawTripEvents
+        .map((e) => {
+          if (!e || typeof e !== 'object') return null
+          return {
+            ...e,
+            latitude: e.latitude ? parseFloat(e.latitude) : null,
+            longitude: e.longitude ? parseFloat(e.longitude) : null,
+            event_time: normalizeDate(e.event_time),
+          }
+        })
+        .filter(Boolean)
 
       const eventsByDesc = {}
       for (const e of tripEvents) {
@@ -358,19 +422,26 @@ routerAdd(
         }
 
         for (const trip of rawPrevTrips) {
-          if (trip.id) {
+          if (trip && typeof trip === 'object' && trip.id) {
             const events = fetchAllPages(`/trips/${trip.id}/events`, 'per_page=100')
             prevTripEvents = prevTripEvents.concat(events)
           }
         }
-      } catch (_) {}
+      } catch (errPrev) {
+        $app.logger().warn('Failed to fetch previous period data', 'error', errPrev.message)
+      }
 
-      const prevTripEventsNormalized = prevTripEvents.map((e) => ({
-        ...e,
-        latitude: e.latitude ? parseFloat(e.latitude) : null,
-        longitude: e.longitude ? parseFloat(e.longitude) : null,
-        event_time: normalizeDate(e.event_time),
-      }))
+      const prevTripEventsNormalized = prevTripEvents
+        .map((e) => {
+          if (!e || typeof e !== 'object') return null
+          return {
+            ...e,
+            latitude: e.latitude ? parseFloat(e.latitude) : null,
+            longitude: e.longitude ? parseFloat(e.longitude) : null,
+            event_time: normalizeDate(e.event_time),
+          }
+        })
+        .filter(Boolean)
 
       const currTotal = tripEvents.length
       const prevTotal = prevTripEventsNormalized.length
@@ -423,6 +494,47 @@ routerAdd(
       })
     } catch (err) {
       const duration = Date.now() - startTime
+
+      if (err.message && err.message.startsWith('DATALBUS_UNAUTHORIZED')) {
+        $app
+          .logger()
+          .error(
+            'Datalbus token expired during fetch',
+            'endpoint',
+            '/backend/v1/fetchDatalbusData',
+            'durationMs',
+            duration,
+            'statusCode',
+            401,
+          )
+        return e.json(401, {
+          success: false,
+          error: 'Credenciais inválidas ou expiradas',
+          code: 'INVALID_CREDENTIALS',
+        })
+      }
+
+      if (err.message && err.message.startsWith('DATALBUS_API_ERROR')) {
+        $app
+          .logger()
+          .error(
+            'Datalbus API failure',
+            'endpoint',
+            '/backend/v1/fetchDatalbusData',
+            'error',
+            err.message,
+            'durationMs',
+            duration,
+            'statusCode',
+            503,
+          )
+        return e.json(503, {
+          success: false,
+          error: 'Serviço Datalbus indisponível',
+          code: 'SERVICE_UNAVAILABLE',
+        })
+      }
+
       $app
         .logger()
         .error(
@@ -431,6 +543,8 @@ routerAdd(
           '/backend/v1/fetchDatalbusData',
           'error',
           err.message,
+          'stack',
+          err.stack || '',
           'durationMs',
           duration,
           'statusCode',
