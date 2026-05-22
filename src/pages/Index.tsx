@@ -24,7 +24,6 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -32,6 +31,7 @@ import {
   Filter,
   AlertTriangle,
   TrendingUp,
+  TrendingDown,
   Info,
   Activity,
   Truck,
@@ -46,11 +46,42 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { RecordModel } from 'pocketbase'
 
 const EmptyState = () => (
-  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground w-full">
-    <Info className="h-8 w-8 mb-2 opacity-50" />
-    <p className="text-sm">Nenhum dado para este período</p>
+  <div className="flex flex-col items-center justify-center py-10 text-[#d1d5db] w-full">
+    <Info className="h-8 w-8 mb-2 opacity-50 text-[#d1d5db]" />
+    <p className="text-[12px] font-normal">Nenhum dado para este período</p>
   </div>
 )
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#1c263d]/90 backdrop-blur-md border border-white/20 p-3 rounded-lg shadow-xl text-[#ffffff]">
+        <p className="text-[14px] font-semibold mb-1">{label}</p>
+        <p className="text-[12px] text-[#e67e22]">
+          Ocorrências: <span className="font-bold">{payload[0].value}</span>
+        </p>
+      </div>
+    )
+  }
+  return null
+}
+
+const PieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#1c263d]/90 backdrop-blur-md border border-white/20 p-3 rounded-lg shadow-xl text-[#ffffff]">
+        <p className="text-[14px] font-semibold mb-1">{payload[0].name}</p>
+        <p className="text-[12px] font-normal" style={{ color: payload[0].payload.fill }}>
+          Total: <span className="font-bold">{payload[0].value}</span>
+        </p>
+      </div>
+    )
+  }
+  return null
+}
+
+const glassCardClass =
+  'bg-[#1c263d]/60 backdrop-blur-xl border border-white/10 rounded-xl hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(230,126,34,0.15)] transition-all duration-300'
 
 export default function Index() {
   const [filters, setFilters] = useState({
@@ -121,7 +152,7 @@ export default function Index() {
     const critical = filteredAlerts.filter((a) => a.event_type === 'Crítico').length
     const fleetStatus = critical > 5 ? 'Crítico' : critical > 0 ? 'Atenção' : 'Normal'
     const fleetStatusColor =
-      critical > 5 ? 'text-destructive' : critical > 0 ? 'text-yellow-500' : 'text-emerald-500'
+      critical > 5 ? 'text-[#ef4444]' : critical > 0 ? 'text-[#f59e0b]' : 'text-[#10b981]'
 
     const garageCounts = {} as Record<string, number>
     let totalForGarage = 0
@@ -168,12 +199,7 @@ export default function Index() {
       const g = a.expand?.vehicle_id?.garage || 'Desconhecida'
       counts[g] = (counts[g] || 0) + 1
     })
-    const colors = [
-      'hsl(var(--chart-1))',
-      'hsl(var(--chart-2))',
-      'hsl(var(--chart-3))',
-      'hsl(var(--chart-4))',
-    ]
+    const colors = ['#e67e22', '#f59e0b', '#10b981', '#ef4444']
     return Object.entries(counts).map(([name, value], i) => ({
       name,
       value,
@@ -211,38 +237,40 @@ export default function Index() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="mb-6 space-y-2">
-          <Skeleton className="h-10 w-64 bg-muted/50" />
-          <Skeleton className="h-4 w-96 bg-muted/50" />
+      <div className="bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col gap-[24px]">
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-64 bg-white/10" />
+          <Skeleton className="h-4 w-96 bg-white/10" />
         </div>
-        <Skeleton className="h-24 w-full mb-6 rounded-xl bg-muted/50" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <Skeleton className={`h-24 w-full rounded-xl bg-white/10`} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px]">
           {Array(6)
             .fill(0)
             .map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-xl bg-muted/50" />
+              <Skeleton key={i} className={`h-[110px] rounded-xl bg-white/10`} />
             ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <Skeleton className="h-[300px] rounded-xl bg-muted/50" />
-          <Skeleton className="h-[300px] rounded-xl bg-muted/50" />
-          <Skeleton className="h-[300px] rounded-xl bg-muted/50" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
+          <Skeleton className="h-[300px] rounded-xl bg-white/10" />
+          <Skeleton className="h-[300px] rounded-xl bg-white/10" />
+          <Skeleton className="h-[300px] rounded-xl bg-white/10" />
         </div>
-        <Skeleton className="h-[400px] rounded-xl bg-muted/50" />
+        <Skeleton className="h-[400px] rounded-xl bg-white/10" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-        <AlertTriangle className="h-12 w-12 text-destructive" />
-        <h2 className="text-xl font-bold">Ocorreu um erro ao carregar os dados</h2>
+      <div className="bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col items-center justify-center text-center space-y-4">
+        <AlertTriangle className="h-12 w-12 text-[#ef4444]" />
+        <h2 className="text-[18px] font-semibold text-[#ffffff]">
+          Ocorreu um erro ao carregar os dados
+        </h2>
         <Button
           onClick={loadData}
           variant="outline"
-          className="border-primary text-primary hover:bg-primary/10"
+          className="border-[#e67e22] text-[#e67e22] hover:bg-[#e67e22]/10 transition-colors duration-300"
         >
           Tentar Novamente
         </Button>
@@ -282,96 +310,162 @@ export default function Index() {
   ]
 
   return (
-    <div className="space-y-6">
-      <div className="mb-6 animate-fade-in-up">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-          <LayoutDashboard className="w-8 h-8 text-primary" />
+    <div className="bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col gap-[24px]">
+      <div>
+        <h1 className="text-[28px] font-bold text-[#ffffff] flex items-center gap-3">
+          <LayoutDashboard className="w-8 h-8 text-[#e67e22]" />
           Dashboard Telemetria
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-[12px] font-normal text-[#d1d5db] mt-1">
           Visão analítica de falhas e eventos em tempo real.
         </p>
       </div>
 
-      <Card
-        className="bg-card/70 backdrop-blur-sm border-primary/20 mb-6 animate-fade-in-up"
-        style={{ animationDelay: '100ms' }}
-      >
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 min-w-[140px]">
-              <label className="text-xs text-muted-foreground mb-1 block">Data Inicial</label>
+      <Card className={`${glassCardClass}`}>
+        <CardContent className="p-[20px]">
+          <div className="flex flex-col lg:flex-row gap-[16px] items-end">
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-[12px] font-normal text-[#d1d5db] mb-1 block">
+                Data Inicial
+              </label>
               <Input
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                className="bg-background/50 border-border/50"
+                className="bg-white/5 border-white/20 text-[#ffffff] h-10 w-full [color-scheme:dark] transition-colors duration-300 focus-visible:ring-[#e67e22]"
               />
             </div>
-            <div className="flex-1 min-w-[140px]">
-              <label className="text-xs text-muted-foreground mb-1 block">Data Final</label>
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-[12px] font-normal text-[#d1d5db] mb-1 block">
+                Data Final
+              </label>
               <Input
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                className="bg-background/50 border-border/50"
+                className="bg-white/5 border-white/20 text-[#ffffff] h-10 w-full [color-scheme:dark] transition-colors duration-300 focus-visible:ring-[#e67e22]"
               />
             </div>
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-xs text-muted-foreground mb-1 block">Garagem</label>
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-[12px] font-normal text-[#d1d5db] mb-1 block">Garagem</label>
               <Select
                 value={filters.garage}
                 onValueChange={(v) => setFilters({ ...filters, garage: v })}
               >
-                <SelectTrigger className="bg-background/50 border-border/50">
+                <SelectTrigger className="bg-white/5 border-white/20 text-[#ffffff] h-10 w-full transition-colors duration-300 focus:ring-[#e67e22]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Todos">Todas</SelectItem>
-                  <SelectItem value="Cursino">Cursino</SelectItem>
-                  <SelectItem value="Sapopemba">Sapopemba</SelectItem>
-                  <SelectItem value="Imirim">Imirim</SelectItem>
+                <SelectContent className="bg-[#1c263d] border-white/20 text-[#ffffff]">
+                  <SelectItem
+                    value="Todos"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Todas
+                  </SelectItem>
+                  <SelectItem
+                    value="Cursino"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Cursino
+                  </SelectItem>
+                  <SelectItem
+                    value="Sapopemba"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Sapopemba
+                  </SelectItem>
+                  <SelectItem
+                    value="Imirim"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Imirim
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1 min-w-[180px]">
-              <label className="text-xs text-muted-foreground mb-1 block">Evento</label>
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-[12px] font-normal text-[#d1d5db] mb-1 block">Evento</label>
               <Select
                 value={filters.event}
                 onValueChange={(v) => setFilters({ ...filters, event: v })}
               >
-                <SelectTrigger className="bg-background/50 border-border/50">
+                <SelectTrigger className="bg-white/5 border-white/20 text-[#ffffff] h-10 w-full transition-colors duration-300 focus:ring-[#e67e22]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Todos">Todos os Eventos</SelectItem>
-                  <SelectItem value="Porta Aberta">Porta Aberta</SelectItem>
-                  <SelectItem value="Limite de Marcha Lenta">Limite de Marcha Lenta</SelectItem>
-                  <SelectItem value="Nível de Óleo Baixo">Nível de Óleo Baixo</SelectItem>
-                  <SelectItem value="Aceleração Excessiva">Aceleração Excessiva</SelectItem>
+                <SelectContent className="bg-[#1c263d] border-white/20 text-[#ffffff]">
+                  <SelectItem
+                    value="Todos"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Todos os Eventos
+                  </SelectItem>
+                  <SelectItem
+                    value="Porta Aberta"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Porta Aberta
+                  </SelectItem>
+                  <SelectItem
+                    value="Limite de Marcha Lenta"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Limite de Marcha Lenta
+                  </SelectItem>
+                  <SelectItem
+                    value="Nível de Óleo Baixo"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Nível de Óleo Baixo
+                  </SelectItem>
+                  <SelectItem
+                    value="Aceleração Excessiva"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Aceleração Excessiva
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1 min-w-[140px]">
-              <label className="text-xs text-muted-foreground mb-1 block">Tipo</label>
+            <div className="flex-1 w-full lg:w-auto">
+              <label className="text-[12px] font-normal text-[#d1d5db] mb-1 block">Tipo</label>
               <Select
                 value={filters.eventType}
                 onValueChange={(v) => setFilters({ ...filters, eventType: v })}
               >
-                <SelectTrigger className="bg-background/50 border-border/50">
+                <SelectTrigger className="bg-white/5 border-white/20 text-[#ffffff] h-10 w-full transition-colors duration-300 focus:ring-[#e67e22]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Todos">Todos os Tipos</SelectItem>
-                  <SelectItem value="Crítico">Crítico</SelectItem>
-                  <SelectItem value="Alerta">Alerta</SelectItem>
-                  <SelectItem value="Informativo">Informativo</SelectItem>
+                <SelectContent className="bg-[#1c263d] border-white/20 text-[#ffffff]">
+                  <SelectItem
+                    value="Todos"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Todos os Tipos
+                  </SelectItem>
+                  <SelectItem
+                    value="Crítico"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Crítico
+                  </SelectItem>
+                  <SelectItem
+                    value="Alerta"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Alerta
+                  </SelectItem>
+                  <SelectItem
+                    value="Informativo"
+                    className="hover:bg-white/10 transition-colors duration-300"
+                  >
+                    Informativo
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <Button
               onClick={() => setAppliedFilters(filters)}
-              className="w-full md:w-auto font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              className="w-full lg:w-auto font-semibold bg-[#e67e22] text-[#ffffff] hover:bg-[#cf711f] h-10 transition-colors duration-300"
             >
               <Filter className="w-4 h-4 mr-2" /> Aplicar Filtros
             </Button>
@@ -379,45 +473,42 @@ export default function Index() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px]">
         {kpiCards.map((card, i) => (
-          <Card
-            key={i}
-            className="border-border/50 hover:border-primary/30 transition-colors animate-fade-in-up"
-            style={{ animationDelay: `${(i + 2) * 50}ms` }}
-          >
-            <CardContent className="p-5 flex flex-row items-center gap-4">
+          <Card key={i} className={`${glassCardClass} flex flex-col`}>
+            <CardContent className="p-[20px] flex flex-row items-center gap-4">
               <div
-                className={`p-3 rounded-xl bg-muted/50 ${card.customColor || (card.isAlert ? 'text-destructive' : 'text-primary')}`}
+                className={`p-3 rounded-xl bg-white/5 border border-white/10 ${card.customColor || (card.isAlert ? 'text-[#e67e22]' : 'text-[#e67e22]')}`}
               >
                 <card.icon className="w-6 h-6" />
               </div>
               <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
+                <p className="text-[12px] font-normal text-[#d1d5db] mb-1">{card.title}</p>
                 <h3
-                  className={`text-2xl font-bold font-mono-num ${card.customColor || (card.isAlert ? 'text-destructive' : '')}`}
+                  className={`text-[36px] font-bold leading-none ${card.customColor || 'text-[#e67e22]'}`}
                 >
                   {card.value}
                 </h3>
-                <p className="text-xs text-muted-foreground mt-1 truncate">{card.subtitle}</p>
+                <p className="text-[12px] font-normal text-[#d1d5db] mt-1 truncate">
+                  {card.subtitle}
+                </p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card
-          className="lg:col-span-1 flex flex-col border-border/50 animate-fade-in-up"
-          style={{ animationDelay: '400ms' }}
-        >
-          <CardHeader className="pb-2 bg-muted/10 border-b border-border/30">
-            <CardTitle className="text-base font-semibold">% Por Evento (Top 5)</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
+        <Card className={`${glassCardClass} flex flex-col`}>
+          <CardHeader className="p-[20px] pb-0 border-none">
+            <CardTitle className="text-[18px] font-semibold text-[#ffffff]">
+              % Por Evento (Top 5)
+            </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center p-4">
+          <CardContent className="flex-1 flex items-center justify-center p-[20px]">
             {topEvents.length > 0 ? (
               <ChartContainer
-                config={{ value: { label: 'Ocorrências', color: 'hsl(var(--chart-1))' } }}
+                config={{ value: { label: 'Ocorrências', color: '#e67e22' } }}
                 className="h-[250px] w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
@@ -431,17 +522,15 @@ export default function Index() {
                       dataKey="name"
                       type="category"
                       width={110}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      tick={{ fill: '#d1d5db', fontSize: 11 }}
                       axisLine={false}
                       tickLine={false}
                     />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="count"
-                      fill="var(--color-value)"
-                      radius={[0, 4, 4, 0]}
-                      barSize={20}
+                    <ChartTooltip
+                      content={<CustomTooltip />}
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                     />
+                    <Bar dataKey="count" fill="#e67e22" radius={[0, 4, 4, 0]} barSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -451,14 +540,13 @@ export default function Index() {
           </CardContent>
         </Card>
 
-        <Card
-          className="lg:col-span-1 flex flex-col border-border/50 animate-fade-in-up"
-          style={{ animationDelay: '450ms' }}
-        >
-          <CardHeader className="pb-2 bg-muted/10 border-b border-border/30">
-            <CardTitle className="text-base font-semibold">% Por Garagem</CardTitle>
+        <Card className={`${glassCardClass} flex flex-col`}>
+          <CardHeader className="p-[20px] pb-0 border-none">
+            <CardTitle className="text-[18px] font-semibold text-[#ffffff]">
+              % Por Garagem
+            </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center p-4">
+          <CardContent className="flex-1 flex items-center justify-center p-[20px]">
             {garageData.length > 0 ? (
               <ChartContainer config={{}} className="h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -471,12 +559,13 @@ export default function Index() {
                       outerRadius={85}
                       paddingAngle={3}
                       dataKey="value"
+                      stroke="none"
                     >
                       {garageData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartTooltip content={<PieTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -486,37 +575,59 @@ export default function Index() {
           </CardContent>
         </Card>
 
-        <Card
-          className="lg:col-span-1 flex flex-col border-border/50 animate-fade-in-up"
-          style={{ animationDelay: '500ms' }}
-        >
-          <CardHeader className="pb-2 bg-muted/10 border-b border-border/30">
-            <CardTitle className="text-base font-semibold">Top 10 Problemáticos</CardTitle>
+        <Card className={`${glassCardClass} flex flex-col`}>
+          <CardHeader className="p-[20px] pb-0 border-none">
+            <CardTitle className="text-[18px] font-semibold text-[#ffffff]">
+              Top 10 Problemáticos
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0 flex-1">
             {topVehicles.length > 0 ? (
-              <div className="overflow-auto max-h-[280px]">
+              <div className="overflow-auto max-h-[290px] px-[20px] pb-[20px]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-border/30 hover:bg-transparent">
-                      <TableHead className="pl-4 text-xs">Placa</TableHead>
-                      <TableHead className="text-right text-xs">Qtd</TableHead>
-                      <TableHead className="text-right text-xs pr-4">% Var</TableHead>
+                    <TableRow className="border-b border-white/10 hover:bg-transparent">
+                      <TableHead className="text-[12px] font-normal text-[#d1d5db] h-auto pb-2 pl-0">
+                        Placa
+                      </TableHead>
+                      <TableHead className="text-[12px] font-normal text-[#d1d5db] text-right h-auto pb-2">
+                        Qtd
+                      </TableHead>
+                      <TableHead className="text-[12px] font-normal text-[#d1d5db] text-right h-auto pb-2 pr-0">
+                        % Var
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {topVehicles.map((v, i) => (
-                      <TableRow key={v.plate} className="border-border/30 hover:bg-muted/30">
-                        <TableCell className="font-mono text-sm py-2.5 pl-4">{v.plate}</TableCell>
-                        <TableCell className="text-right text-sm py-2.5">{v.count}</TableCell>
-                        <TableCell
-                          className={`text-right text-sm py-2.5 pr-4 ${i % 2 === 0 ? 'text-destructive' : 'text-emerald-500'}`}
+                    {topVehicles.map((v, i) => {
+                      const isPositive = i % 2 === 0
+                      return (
+                        <TableRow
+                          key={v.plate}
+                          className="border-b border-white/5 hover:bg-white/5 transition-colors duration-300"
                         >
-                          {i % 2 === 0 ? '+' : '-'}
-                          {v.variation}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          <TableCell className="text-[14px] font-normal text-[#ffffff] py-3 pl-0">
+                            {v.plate}
+                          </TableCell>
+                          <TableCell className="text-[14px] font-normal text-[#ffffff] text-right py-3">
+                            {v.count}
+                          </TableCell>
+                          <TableCell
+                            className={`text-[14px] font-normal py-3 pr-0 text-right ${isPositive ? 'text-[#ef4444]' : 'text-[#10b981]'}`}
+                          >
+                            <div className="flex justify-end items-center gap-1">
+                              {isPositive ? (
+                                <TrendingUp className="w-[16px] h-[16px]" />
+                              ) : (
+                                <TrendingDown className="w-[16px] h-[16px]" />
+                              )}
+                              {isPositive ? '+' : '-'}
+                              {v.variation}%
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -527,53 +638,76 @@ export default function Index() {
         </Card>
       </div>
 
-      <Card className="border-border/50 animate-fade-in-up" style={{ animationDelay: '550ms' }}>
-        <CardHeader className="border-b border-border/30 bg-muted/10">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-primary" /> Falhas de Diagnóstico (DTC)
+      <Card className={`${glassCardClass}`}>
+        <CardHeader className="p-[20px] pb-4 border-b border-white/10">
+          <CardTitle className="text-[18px] font-semibold text-[#ffffff] flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-[#e67e22]" /> Falhas de Diagnóstico (DTC)
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-[20px]">
           {dtcs.length > 0 ? (
             <div className="overflow-x-auto max-h-[400px]">
               <Table>
-                <TableHeader className="sticky top-0 bg-muted/10 backdrop-blur z-10">
-                  <TableRow className="border-border/30 hover:bg-transparent">
-                    <TableHead className="pl-6">Descrição da Falha</TableHead>
-                    <TableHead className="text-right">Qtd Ocorrências</TableHead>
-                    <TableHead className="text-right">% Variação</TableHead>
-                    <TableHead className="pr-6 text-center">Status</TableHead>
+                <TableHeader>
+                  <TableRow className="border-b border-white/10 hover:bg-transparent">
+                    <TableHead className="text-[12px] font-normal text-[#d1d5db] h-auto pb-3 pl-0">
+                      Descrição da Falha
+                    </TableHead>
+                    <TableHead className="text-[12px] font-normal text-[#d1d5db] text-right h-auto pb-3">
+                      Qtd Ocorrências
+                    </TableHead>
+                    <TableHead className="text-[12px] font-normal text-[#d1d5db] text-right h-auto pb-3">
+                      % Variação
+                    </TableHead>
+                    <TableHead className="text-[12px] font-normal text-[#d1d5db] text-center h-auto pb-3 pr-0">
+                      Status
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dtcs.map((d, i) => (
-                    <TableRow
-                      key={d.desc}
-                      className="cursor-pointer hover:bg-primary/10 border-border/30 transition-colors"
-                      onClick={() => setSelectedDtc(d)}
-                    >
-                      <TableCell className="pl-6 font-medium text-sm">{d.desc}</TableCell>
-                      <TableCell className="text-right font-mono-num text-sm">{d.count}</TableCell>
-                      <TableCell
-                        className={`text-right text-sm ${i % 3 === 0 ? 'text-emerald-500' : 'text-destructive'}`}
+                  {dtcs.map((d, i) => {
+                    const isPositive = i % 3 !== 0
+                    return (
+                      <TableRow
+                        key={d.desc}
+                        className="border-b border-white/5 hover:bg-white/10 transition-colors duration-300 cursor-pointer"
+                        onClick={() => setSelectedDtc(d)}
                       >
-                        {i % 3 === 0 ? '-' : '+'}
-                        {(d.count * 1.5 + i).toFixed(1)}%
-                      </TableCell>
-                      <TableCell className="pr-6 text-center">
-                        <Badge
-                          variant={d.status === 'Crítico' ? 'destructive' : 'outline'}
-                          className={
-                            d.status !== 'Crítico'
-                              ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                              : ''
-                          }
+                        <TableCell className="text-[14px] font-normal text-[#ffffff] py-3 pl-0">
+                          {d.desc}
+                        </TableCell>
+                        <TableCell className="text-[14px] font-normal text-[#ffffff] text-right py-3">
+                          {d.count}
+                        </TableCell>
+                        <TableCell
+                          className={`text-[14px] font-normal py-3 text-right ${isPositive ? 'text-[#ef4444]' : 'text-[#10b981]'}`}
                         >
-                          {d.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          <div className="flex justify-end items-center gap-1">
+                            {isPositive ? (
+                              <TrendingUp className="w-[16px] h-[16px]" />
+                            ) : (
+                              <TrendingDown className="w-[16px] h-[16px]" />
+                            )}
+                            {isPositive ? '+' : '-'}
+                            {(d.count * 1.5 + i).toFixed(1)}%
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 pr-0 text-center">
+                          <span
+                            className={`px-2 py-1 rounded text-[12px] font-semibold ${
+                              d.status === 'Crítico'
+                                ? 'bg-[#ef4444]/20 text-[#ef4444]'
+                                : d.status === 'Alerta'
+                                  ? 'bg-[#f59e0b]/20 text-[#f59e0b]'
+                                  : 'bg-[#10b981]/20 text-[#10b981]'
+                            }`}
+                          >
+                            {d.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -584,50 +718,59 @@ export default function Index() {
       </Card>
 
       <Dialog open={!!selectedDtc} onOpenChange={(open) => !open && setSelectedDtc(null)}>
-        <DialogContent className="border-border/50 bg-card sm:max-w-md">
+        <DialogContent className="bg-[#1c263d]/95 backdrop-blur-xl border-white/10 text-[#ffffff] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <AlertTriangle className="w-5 h-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2 text-[28px] font-bold text-[#ffffff]">
+              <AlertTriangle className="w-6 h-6 text-[#e67e22]" />
               Detalhes da Falha
             </DialogTitle>
-            <DialogDescription>Análise técnica e recomendações do sistema.</DialogDescription>
+            <DialogDescription className="text-[12px] font-normal text-[#d1d5db]">
+              Análise técnica e recomendações do sistema.
+            </DialogDescription>
           </DialogHeader>
           {selectedDtc && (
             <div className="space-y-4 pt-2">
-              <div className="p-4 rounded-xl bg-muted/40 border border-border/50 space-y-4">
+              <div className="p-[20px] rounded-xl bg-white/5 border border-white/10 space-y-4">
                 <div>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-1">
+                  <span className="text-[12px] font-normal text-[#d1d5db] uppercase tracking-wider block mb-1">
                     Descrição
                   </span>
-                  <p className="font-medium text-sm leading-tight">{selectedDtc.desc}</p>
+                  <p className="font-semibold text-[18px] leading-tight text-[#ffffff]">
+                    {selectedDtc.desc}
+                  </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
                   <div>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-1">
+                    <span className="text-[12px] font-normal text-[#d1d5db] uppercase tracking-wider block mb-1">
                       Ocorrências
                     </span>
-                    <p className="font-mono-num text-xl font-bold">{selectedDtc.count}</p>
+                    <p className="text-[36px] font-bold text-[#e67e22] leading-none">
+                      {selectedDtc.count}
+                    </p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold block mb-1">
+                    <span className="text-[12px] font-normal text-[#d1d5db] uppercase tracking-wider block mb-1">
                       Status
                     </span>
-                    <Badge
-                      variant={selectedDtc.status === 'Crítico' ? 'destructive' : 'outline'}
-                      className={
-                        selectedDtc.status !== 'Crítico'
-                          ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                          : ''
-                      }
-                    >
-                      {selectedDtc.status}
-                    </Badge>
+                    <div className="mt-2">
+                      <span
+                        className={`px-3 py-1.5 rounded text-[14px] font-semibold ${
+                          selectedDtc.status === 'Crítico'
+                            ? 'bg-[#ef4444]/20 text-[#ef4444]'
+                            : selectedDtc.status === 'Alerta'
+                              ? 'bg-[#f59e0b]/20 text-[#f59e0b]'
+                              : 'bg-[#10b981]/20 text-[#10b981]'
+                        }`}
+                      >
+                        {selectedDtc.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="text-sm text-primary-foreground bg-primary/20 p-3 rounded-xl border border-primary/30 flex items-start gap-3">
-                <Info className="w-5 h-5 shrink-0 mt-0.5 text-primary" />
-                <p className="leading-snug">
+              <div className="text-[14px] text-[#ffffff] bg-[#e67e22]/20 p-[20px] rounded-xl border border-[#e67e22]/30 flex items-start gap-3">
+                <Info className="w-5 h-5 shrink-0 mt-0.5 text-[#e67e22]" />
+                <p className="leading-snug font-normal">
                   Recomenda-se verificação imediata na próxima parada em garagem para evitar danos
                   prolongados ao veículo e perda de telemetria.
                 </p>
