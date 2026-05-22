@@ -66,7 +66,7 @@ export function useDatalbusApi<T extends DatalbusAction>(
 
   const authenticate = useCallback(async () => {
     try {
-      const res = await pb.send('/backend/v1/autenticacaoDatalbus', {
+      const res = await pb.send('/backend/v1/autenticacao_datalbus', {
         method: 'POST',
         body: JSON.stringify({}),
         headers: { 'Content-Type': 'application/json' },

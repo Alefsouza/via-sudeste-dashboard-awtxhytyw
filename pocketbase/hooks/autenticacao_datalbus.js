@@ -1,4 +1,4 @@
-routerAdd('POST', '/backend/v1/autenticacaoDatalbus', (e) => {
+routerAdd('POST', '/backend/v1/autenticacao_datalbus', (e) => {
   if (e.response && typeof e.response.header === 'function') {
     e.response.header().set('Access-Control-Allow-Origin', '*')
     e.response.header().set('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -17,9 +17,11 @@ routerAdd('POST', '/backend/v1/autenticacaoDatalbus', (e) => {
     })
   }
 
+  const baseUrl = $secrets.get('DATALBUS_BASE_URL') || 'https://datalbus.com.br:8000/api/v2'
+
   try {
     const res = $http.send({
-      url: 'https://datalbus.com.br:8000/api/v2/login',
+      url: `${baseUrl}/login`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, password: password }),

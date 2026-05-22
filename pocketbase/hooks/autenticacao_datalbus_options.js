@@ -1,4 +1,4 @@
-routerAdd('OPTIONS', '/backend/v1/autenticacaoDatalbus', (e) => {
+routerAdd('OPTIONS', '/backend/v1/autenticacao_datalbus', (e) => {
   if (e.response && typeof e.response.header === 'function') {
     e.response.header().set('Access-Control-Allow-Origin', '*')
     e.response.header().set('Access-Control-Allow-Methods', 'POST, OPTIONS')
