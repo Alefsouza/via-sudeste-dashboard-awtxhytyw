@@ -35,12 +35,13 @@ routerAdd(
     }
 
     const body = e.requestInfo().body || {}
-    const dataFiltro = body.date
-    if (!dataFiltro) {
+    const startDate = body.start_date
+    const endDate = body.end_date
+    if (!startDate || !endDate) {
       $app
         .logger()
         .error(
-          'Missing date parameter',
+          'Missing date parameters',
           'endpoint',
           '/backend/v1/fetchDatalbusData',
           'statusCode',
@@ -48,8 +49,22 @@ routerAdd(
         )
       return e.json(400, {
         success: false,
-        error: 'Parâmetros obrigatórios faltando',
+        error: 'Parâmetros obrigatórios faltando (start_date, end_date)',
         code: 'MISSING_PARAMS',
+      })
+    }
+
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const MAX_DAYS = 15
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays > MAX_DAYS) {
+      return e.json(400, {
+        success: false,
+        error: `Período máximo permitido é de ${MAX_DAYS} dias.`,
+        code: 'MAX_PERIOD_EXCEEDED',
       })
     }
 
@@ -209,8 +224,13 @@ routerAdd(
       // Drivers
       const rawDrivers = fetchAllPages('/drivers', 'per_page=100')
 
-      // Trips
-      const rawTrips = fetchAllPages('/trips', `date=${dataFiltro}&per_page=100`)
+      // Trips for Date Range
+      let rawTrips = []
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0]
+        const dailyTrips = fetchAllPages('/trips', `date=${dateStr}&per_page=100`)
+        rawTrips = rawTrips.concat(dailyTrips)
+      }
 
       // Trip Events
       let rawTripEvents = []
@@ -325,9 +345,17 @@ routerAdd(
       // Previous period variation
       let prevTripEvents = []
       try {
-        const prevDateObj = new Date(new Date(dataFiltro).getTime() - 24 * 60 * 60 * 1000)
-        const prevDateFiltro = prevDateObj.toISOString().split('T')[0]
-        const rawPrevTrips = fetchAllPages('/trips', `date=${prevDateFiltro}&per_page=100`)
+        const prevEnd = new Date(start)
+        prevEnd.setDate(prevEnd.getDate() - 1)
+        const prevStart = new Date(prevEnd)
+        prevStart.setDate(prevStart.getDate() - diffDays)
+
+        let rawPrevTrips = []
+        for (let d = new Date(prevStart); d <= prevEnd; d.setDate(d.getDate() + 1)) {
+          const dateStr = d.toISOString().split('T')[0]
+          const dailyTrips = fetchAllPages('/trips', `date=${dateStr}&per_page=100`)
+          rawPrevTrips = rawPrevTrips.concat(dailyTrips)
+        }
 
         for (const trip of rawPrevTrips) {
           if (trip.id) {
@@ -337,13 +365,26 @@ routerAdd(
         }
       } catch (_) {}
 
+      const prevTripEventsNormalized = prevTripEvents.map((e) => ({
+        ...e,
+        latitude: e.latitude ? parseFloat(e.latitude) : null,
+        longitude: e.longitude ? parseFloat(e.longitude) : null,
+        event_time: normalizeDate(e.event_time),
+      }))
+
       const currTotal = tripEvents.length
-      const prevTotal = prevTripEvents.length
+      const prevTotal = prevTripEventsNormalized.length
       let eventsVariationPercent = 0
       if (prevTotal > 0) {
         eventsVariationPercent = ((currTotal - prevTotal) / prevTotal) * 100
       } else if (currTotal > 0) {
         eventsVariationPercent = 100
+      }
+
+      const prevEventsByDesc = {}
+      for (const e of prevTripEventsNormalized) {
+        const desc = e.event_type_description || 'Unknown'
+        prevEventsByDesc[desc] = (prevEventsByDesc[desc] || 0) + 1
       }
 
       const duration = Date.now() - startTime
@@ -355,8 +396,10 @@ routerAdd(
           '/backend/v1/fetchDatalbusData',
           'durationMs',
           duration,
-          'date',
-          dataFiltro,
+          'startDate',
+          startDate,
+          'endDate',
+          endDate,
         )
 
       return e.json(200, {
@@ -366,15 +409,17 @@ routerAdd(
           drivers,
           trips,
           tripEvents,
+          prevTripEvents: prevTripEventsNormalized,
           eventsSchema: rawEventsSchema,
           aggregations: {
             eventsByDescription: eventsByDesc,
             eventsByGarage,
             eventsVariationPercent,
+            prevEventsByDesc,
           },
         },
         timestamp: new Date().toISOString(),
-        period: { start: dataFiltro, end: dataFiltro },
+        period: { start: startDate, end: endDate },
       })
     } catch (err) {
       const duration = Date.now() - startTime

@@ -25,10 +25,9 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import {
-  Filter,
   AlertTriangle,
   TrendingUp,
   TrendingDown,
@@ -39,16 +38,16 @@ import {
   LayoutDashboard,
 } from 'lucide-react'
 
-import { getVehicles } from '@/services/vehicles'
-import { getDrivers } from '@/services/drivers'
-import { getAllDashboardAlerts } from '@/services/alerts'
-import { useRealtime } from '@/hooks/use-realtime'
-import { RecordModel } from 'pocketbase'
+import pb from '@/lib/pocketbase/client'
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-10 text-[#d1d5db] w-full">
-    <Info className="h-8 w-8 mb-2 opacity-50 text-[#d1d5db]" />
-    <p className="text-[12px] font-normal">Nenhum dado para este período</p>
+    <img
+      src="https://img.usecurling.com/p/120/120?q=empty%20box&color=blue"
+      alt="Empty"
+      className="w-24 h-24 mb-4 opacity-70"
+    />
+    <p className="text-[14px] font-normal">Nenhum dado para este período</p>
   </div>
 )
 
@@ -83,85 +82,170 @@ const PieTooltip = ({ active, payload }: any) => {
 const glassCardClass =
   'bg-[#1c263d]/60 backdrop-blur-xl border border-white/10 rounded-xl hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(230,126,34,0.15)] transition-all duration-300'
 
+const getMonday = (d: Date) => {
+  const copy = new Date(d)
+  const day = copy.getDay()
+  const diff = copy.getDate() - day + (day === 0 ? -6 : 1)
+  return new Date(copy.setDate(diff))
+}
+
 export default function Index() {
+  const initialMonday = getMonday(new Date())
+  const initialSunday = new Date(initialMonday)
+  initialSunday.setDate(initialMonday.getDate() + 6)
+
   const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
+    startDate: initialMonday.toISOString().split('T')[0],
+    endDate: initialSunday.toISOString().split('T')[0],
     garage: 'Todos',
     event: 'Todos',
     eventType: 'Todos',
   })
-  const [appliedFilters, setAppliedFilters] = useState(filters)
 
+  const [debouncedFilters, setDebouncedFilters] = useState(filters)
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  const [vehicles, setVehicles] = useState<RecordModel[]>([])
-  const [drivers, setDrivers] = useState<RecordModel[]>([])
-  const [alerts, setAlerts] = useState<RecordModel[]>([])
-
+  const [errorMsg, setErrorMsg] = useState('')
   const [selectedDtc, setSelectedDtc] = useState<any>(null)
 
-  const loadData = async () => {
-    setError(false)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedFilters(filters)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [filters])
+
+  useEffect(() => {
+    fetchData(debouncedFilters)
+  }, [debouncedFilters])
+
+  const fetchData = async (currentFilters: any) => {
+    setLoading(true)
+    setErrorMsg('')
     try {
-      const [vRes, dRes, aRes] = await Promise.all([
-        getVehicles(),
-        getDrivers(),
-        getAllDashboardAlerts(),
-      ])
-      setVehicles(vRes)
-      setDrivers(dRes)
-      setAlerts(aRes.items)
-    } catch {
-      setError(true)
+      const payload = {
+        start_date: currentFilters.startDate,
+        end_date: currentFilters.endDate,
+        garage: currentFilters.garage,
+        event: currentFilters.event,
+        eventType: currentFilters.eventType,
+      }
+      const res = await pb.send('/backend/v1/fetchDatalbusData', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (
+        res.success &&
+        res.data &&
+        Array.isArray(res.data.assets) &&
+        Array.isArray(res.data.tripEvents)
+      ) {
+        setData(res.data)
+      } else {
+        setErrorMsg(res.error || 'Formato de dados inválido recebido da API')
+      }
+    } catch (err: any) {
+      if (err.response && err.response.error) {
+        setErrorMsg(err.response.error)
+      } else {
+        setErrorMsg('Erro ao carregar dados. Verifique a conexão com a API.')
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const options = useMemo(() => {
+    if (!data) return { garages: [], events: [], eventTypes: [] }
+    const garages = Array.from(
+      new Set((data.assets || []).map((a: any) => a.asset_group).filter(Boolean)),
+    ) as string[]
+    const events = Array.from(
+      new Set((data.tripEvents || []).map((e: any) => e.event_type_description).filter(Boolean)),
+    ) as string[]
+    const eventTypes = Array.from(
+      new Set((data.tripEvents || []).map((e: any) => String(e.event_type_id)).filter(Boolean)),
+    ) as string[]
+    return { garages: garages.sort(), events: events.sort(), eventTypes: eventTypes.sort() }
+  }, [data])
 
-  useRealtime('telemetry_logs', () => loadData())
-  useRealtime('alerts', () => loadData())
+  const filteredAssets = useMemo(() => {
+    if (!data) return []
+    let assets = data.assets || []
+    if (debouncedFilters.garage !== 'Todos') {
+      assets = assets.filter((a: any) => a.asset_group === debouncedFilters.garage)
+    }
+    return assets
+  }, [data, debouncedFilters.garage])
 
-  const filteredAlerts = useMemo(() => {
-    return alerts.filter((a) => {
-      if (
-        appliedFilters.garage !== 'Todos' &&
-        a.expand?.vehicle_id?.garage !== appliedFilters.garage
+  const filteredTripEvents = useMemo(() => {
+    if (!data) return []
+    let events = data.tripEvents || []
+    if (debouncedFilters.garage !== 'Todos') {
+      const validAssetIds = new Set(filteredAssets.map((a: any) => a.id))
+      events = events.filter((e: any) => validAssetIds.has(e.asset_id))
+    }
+    if (debouncedFilters.event !== 'Todos') {
+      events = events.filter((e: any) => e.event_type_description === debouncedFilters.event)
+    }
+    if (debouncedFilters.eventType !== 'Todos') {
+      events = events.filter(
+        (e: any) => String(e.event_type_id) === String(debouncedFilters.eventType),
       )
-        return false
-      if (appliedFilters.event !== 'Todos' && a.event_name !== appliedFilters.event) return false
-      if (appliedFilters.eventType !== 'Todos' && a.event_type !== appliedFilters.eventType)
-        return false
-      if (appliedFilters.startDate && new Date(a.created) < new Date(appliedFilters.startDate))
-        return false
-      if (
-        appliedFilters.endDate &&
-        new Date(a.created) > new Date(appliedFilters.endDate + 'T23:59:59')
+    }
+    return events
+  }, [data, filteredAssets, debouncedFilters])
+
+  const filteredPrevTripEvents = useMemo(() => {
+    if (!data) return []
+    let events = data.prevTripEvents || []
+    if (debouncedFilters.garage !== 'Todos') {
+      const validAssetIds = new Set(filteredAssets.map((a: any) => a.id))
+      events = events.filter((e: any) => validAssetIds.has(e.asset_id))
+    }
+    if (debouncedFilters.event !== 'Todos') {
+      events = events.filter((e: any) => e.event_type_description === debouncedFilters.event)
+    }
+    if (debouncedFilters.eventType !== 'Todos') {
+      events = events.filter(
+        (e: any) => String(e.event_type_id) === String(debouncedFilters.eventType),
       )
-        return false
-      return true
-    })
-  }, [alerts, appliedFilters])
+    }
+    return events
+  }, [data, filteredAssets, debouncedFilters])
+
+  const variationPercent = useMemo(() => {
+    const curr = filteredTripEvents.length
+    const prev = filteredPrevTripEvents.length
+    if (prev > 0) return ((curr - prev) / prev) * 100
+    if (curr > 0) return 100
+    return 0
+  }, [filteredTripEvents, filteredPrevTripEvents])
 
   const kpis = useMemo(() => {
-    const critical = filteredAlerts.filter((a) => a.event_type === 'Crítico').length
-    const fleetStatus = critical > 5 ? 'Crítico' : critical > 0 ? 'Atenção' : 'Normal'
-    const fleetStatusColor =
-      critical > 5 ? 'text-[#ef4444]' : critical > 0 ? 'text-[#f59e0b]' : 'text-[#10b981]'
+    let fleetStatus = 'Normal'
+    let fleetStatusColor = 'text-[#10b981]'
+    if (variationPercent > 10) {
+      fleetStatus = 'Crítico'
+      fleetStatusColor = 'text-[#ef4444]'
+    } else if (variationPercent >= -10 && variationPercent <= 10) {
+      fleetStatus = 'Atenção'
+      fleetStatusColor = 'text-[#f59e0b]'
+    }
 
-    const garageCounts = {} as Record<string, number>
+    const garageCounts: Record<string, number> = {}
     let totalForGarage = 0
-    filteredAlerts.forEach((a) => {
-      const g = a.expand?.vehicle_id?.garage
-      if (g) {
-        garageCounts[g] = (garageCounts[g] || 0) + 1
-        totalForGarage++
-      }
+    const assetGroupMap: Record<string, string> = {}
+    ;(data?.assets || []).forEach((a: any) => {
+      if (a.id) assetGroupMap[a.id] = a.asset_group || 'Desconhecida'
+    })
+
+    filteredTripEvents.forEach((e: any) => {
+      const g = e.asset_id && assetGroupMap[e.asset_id] ? assetGroupMap[e.asset_id] : 'Desconhecida'
+      garageCounts[g] = (garageCounts[g] || 0) + 1
+      totalForGarage++
     })
 
     const sortedGarages = Object.entries(garageCounts).sort((a, b) => b[1] - a[1])
@@ -172,70 +256,114 @@ export default function Index() {
         .join(' | ') || 'Nenhum'
 
     return {
-      carros: vehicles.length > 0 ? 615 : 0,
-      motoristas: drivers.length,
-      eventos: filteredAlerts.length,
+      carros: data ? filteredAssets.length : 0,
+      motoristas: data ? data.drivers.length : 0,
+      eventos: filteredTripEvents.length,
+      variacao: (variationPercent > 0 ? '+' : '') + variationPercent.toFixed(1) + '%',
       frotaStatus: fleetStatus,
       frotaColor: fleetStatusColor,
       garageSummary: garagePercents,
     }
-  }, [vehicles, drivers, filteredAlerts])
+  }, [data, filteredAssets, filteredTripEvents, variationPercent])
 
   const topEvents = useMemo(() => {
-    const counts = {} as Record<string, number>
-    filteredAlerts.forEach((a) => {
-      const name = a.event_name || 'Desconhecido'
-      counts[name] = (counts[name] || 0) + 1
+    const counts: Record<string, number> = {}
+    filteredTripEvents.forEach((e: any) => {
+      const desc = e.event_type_description || 'Desconhecido'
+      counts[desc] = (counts[desc] || 0) + 1
     })
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
-  }, [filteredAlerts])
+  }, [filteredTripEvents])
 
   const garageData = useMemo(() => {
-    const counts = {} as Record<string, number>
-    filteredAlerts.forEach((a) => {
-      const g = a.expand?.vehicle_id?.garage || 'Desconhecida'
+    const counts: Record<string, number> = {}
+    const assetGroupMap: Record<string, string> = {}
+    ;(data?.assets || []).forEach((a: any) => {
+      if (a.id) assetGroupMap[a.id] = a.asset_group || 'Desconhecida'
+    })
+    filteredTripEvents.forEach((e: any) => {
+      const g = e.asset_id && assetGroupMap[e.asset_id] ? assetGroupMap[e.asset_id] : 'Desconhecida'
       counts[g] = (counts[g] || 0) + 1
     })
-    const colors = ['#e67e22', '#f59e0b', '#10b981', '#ef4444']
-    return Object.entries(counts).map(([name, value], i) => ({
-      name,
-      value,
-      fill: colors[i % colors.length],
-    }))
-  }, [filteredAlerts])
+    const colors = ['#e67e22', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6']
+    return Object.entries(counts)
+      .map(([name, value], i) => ({
+        name,
+        value,
+        fill: colors[i % colors.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [data, filteredTripEvents])
 
   const topVehicles = useMemo(() => {
-    const counts = {} as Record<string, number>
-    filteredAlerts.forEach((a) => {
-      const plate = a.expand?.vehicle_id?.plate
-      if (plate) counts[plate] = (counts[plate] || 0) + 1
+    const counts: Record<string, number> = {}
+    filteredTripEvents.forEach((e: any) => {
+      if (e.asset_id) counts[e.asset_id] = (counts[e.asset_id] || 0) + 1
     })
+    const prevCounts: Record<string, number> = {}
+    filteredPrevTripEvents.forEach((e: any) => {
+      if (e.asset_id) prevCounts[e.asset_id] = (prevCounts[e.asset_id] || 0) + 1
+    })
+    const assetMap: Record<string, string> = {}
+    ;(data?.assets || []).forEach((a: any) => {
+      if (a.id) assetMap[a.id] = a.license_plate
+    })
+
     return Object.entries(counts)
-      .map(([plate, count], i) => ({
-        plate,
-        count,
-        variation: ((count * 3.14 + i) % 20).toFixed(1),
-      }))
+      .map(([id, count]) => {
+        const prevCount = prevCounts[id] || 0
+        let variation = 0
+        if (prevCount > 0) variation = ((count - prevCount) / prevCount) * 100
+        else if (count > 0) variation = 100
+
+        return {
+          plate: assetMap[id] || 'Sem Placa',
+          count,
+          variation: variation.toFixed(1),
+        }
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
-  }, [filteredAlerts])
+  }, [data, filteredTripEvents, filteredPrevTripEvents])
 
   const dtcs = useMemo(() => {
-    const dtcAlerts = filteredAlerts.filter((a) => a.dtc_description)
-    const grouped = {} as Record<string, any>
-    dtcAlerts.forEach((a) => {
-      if (!grouped[a.dtc_description]) {
-        grouped[a.dtc_description] = { desc: a.dtc_description, count: 0, status: a.event_type }
-      }
-      grouped[a.dtc_description].count++
+    const currentCounts: Record<string, number> = {}
+    filteredTripEvents.forEach((e: any) => {
+      const desc = e.event_type_description || 'Desconhecido'
+      currentCounts[desc] = (currentCounts[desc] || 0) + 1
     })
-    return Object.values(grouped).sort((a, b) => b.count - a.count)
-  }, [filteredAlerts])
 
-  if (loading) {
+    const prevCounts: Record<string, number> = {}
+    filteredPrevTripEvents.forEach((e: any) => {
+      const desc = e.event_type_description || 'Desconhecido'
+      prevCounts[desc] = (prevCounts[desc] || 0) + 1
+    })
+
+    return Object.entries(currentCounts)
+      .map(([desc, count]) => {
+        const prevCount = prevCounts[desc] || 0
+        let variation = 0
+        if (prevCount > 0) variation = ((count - prevCount) / prevCount) * 100
+        else if (count > 0) variation = 100
+
+        let status = 'Informativo'
+        if (count > 100) status = 'Crítico'
+        else if (count > 0) status = 'Alerta'
+
+        return {
+          desc,
+          count,
+          variation: variation,
+          status,
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+  }, [filteredTripEvents, filteredPrevTripEvents])
+
+  if (loading && !data) {
     return (
       <div className="bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col gap-[24px]">
         <div className="space-y-2">
@@ -260,15 +388,13 @@ export default function Index() {
     )
   }
 
-  if (error) {
+  if (errorMsg && !data) {
     return (
       <div className="bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col items-center justify-center text-center space-y-4">
         <AlertTriangle className="h-12 w-12 text-[#ef4444]" />
-        <h2 className="text-[18px] font-semibold text-[#ffffff]">
-          Ocorreu um erro ao carregar os dados
-        </h2>
+        <h2 className="text-[18px] font-semibold text-[#ffffff]">{errorMsg}</h2>
         <Button
-          onClick={loadData}
+          onClick={() => fetchData(debouncedFilters)}
           variant="outline"
           className="border-[#e67e22] text-[#e67e22] hover:bg-[#e67e22]/10 transition-colors duration-300"
         >
@@ -279,12 +405,17 @@ export default function Index() {
   }
 
   const kpiCards = [
-    { title: 'Qtd Carros', value: kpis.carros, icon: Truck, subtitle: 'Frota ativa conectada' },
+    {
+      title: 'Qtd Carros',
+      value: kpis.carros,
+      icon: Truck,
+      subtitle: 'Frota conectada (filtrada)',
+    },
     {
       title: 'Qtd Motoristas',
       value: kpis.motoristas,
       icon: Users,
-      subtitle: 'Motoristas logados',
+      subtitle: 'Total de motoristas',
     },
     {
       title: 'Qtd Eventos',
@@ -294,9 +425,9 @@ export default function Index() {
     },
     {
       title: '% Variação',
-      value: '+12.4%',
-      icon: TrendingUp,
-      subtitle: 'Vs. mês anterior',
+      value: kpis.variacao,
+      icon: kpis.variacao.startsWith('-') ? TrendingDown : TrendingUp,
+      subtitle: 'Vs. período anterior',
       isAlert: true,
     },
     {
@@ -310,7 +441,9 @@ export default function Index() {
   ]
 
   return (
-    <div className="bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col gap-[24px]">
+    <div
+      className={`bg-[#1c263d] text-[#ffffff] min-h-[calc(100vh-4rem)] -m-4 md:-m-6 lg:-m-8 p-4 md:p-6 lg:p-8 animate-fade-in-200 flex flex-col gap-[24px] transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}
+    >
       <div>
         <h1 className="text-[28px] font-bold text-[#ffffff] flex items-center gap-3">
           <LayoutDashboard className="w-8 h-8 text-[#e67e22]" />
@@ -362,24 +495,15 @@ export default function Index() {
                   >
                     Todas
                   </SelectItem>
-                  <SelectItem
-                    value="Cursino"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Cursino
-                  </SelectItem>
-                  <SelectItem
-                    value="Sapopemba"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Sapopemba
-                  </SelectItem>
-                  <SelectItem
-                    value="Imirim"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Imirim
-                  </SelectItem>
+                  {options.garages.map((g) => (
+                    <SelectItem
+                      key={g}
+                      value={g}
+                      className="hover:bg-white/10 transition-colors duration-300"
+                    >
+                      {g}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -399,30 +523,15 @@ export default function Index() {
                   >
                     Todos os Eventos
                   </SelectItem>
-                  <SelectItem
-                    value="Porta Aberta"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Porta Aberta
-                  </SelectItem>
-                  <SelectItem
-                    value="Limite de Marcha Lenta"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Limite de Marcha Lenta
-                  </SelectItem>
-                  <SelectItem
-                    value="Nível de Óleo Baixo"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Nível de Óleo Baixo
-                  </SelectItem>
-                  <SelectItem
-                    value="Aceleração Excessiva"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Aceleração Excessiva
-                  </SelectItem>
+                  {options.events.map((ev) => (
+                    <SelectItem
+                      key={ev}
+                      value={ev}
+                      className="hover:bg-white/10 transition-colors duration-300"
+                    >
+                      {ev}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -442,33 +551,18 @@ export default function Index() {
                   >
                     Todos os Tipos
                   </SelectItem>
-                  <SelectItem
-                    value="Crítico"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Crítico
-                  </SelectItem>
-                  <SelectItem
-                    value="Alerta"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Alerta
-                  </SelectItem>
-                  <SelectItem
-                    value="Informativo"
-                    className="hover:bg-white/10 transition-colors duration-300"
-                  >
-                    Informativo
-                  </SelectItem>
+                  {options.eventTypes.map((et) => (
+                    <SelectItem
+                      key={et}
+                      value={et}
+                      className="hover:bg-white/10 transition-colors duration-300"
+                    >
+                      Tipo {et}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              onClick={() => setAppliedFilters(filters)}
-              className="w-full lg:w-auto font-semibold bg-[#e67e22] text-[#ffffff] hover:bg-[#cf711f] h-10 transition-colors duration-300"
-            >
-              <Filter className="w-4 h-4 mr-2" /> Aplicar Filtros
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -478,7 +572,7 @@ export default function Index() {
           <Card key={i} className={`${glassCardClass} flex flex-col`}>
             <CardContent className="p-[20px] flex flex-row items-center gap-4">
               <div
-                className={`p-3 rounded-xl bg-white/5 border border-white/10 ${card.customColor || (card.isAlert ? 'text-[#e67e22]' : 'text-[#e67e22]')}`}
+                className={`p-3 rounded-xl bg-white/5 border border-white/10 ${card.customColor || (card.isAlert ? (card.value.startsWith('-') ? 'text-[#10b981]' : 'text-[#ef4444]') : 'text-[#e67e22]')}`}
               >
                 <card.icon className="w-6 h-6" />
               </div>
@@ -600,10 +694,10 @@ export default function Index() {
                   </TableHeader>
                   <TableBody>
                     {topVehicles.map((v, i) => {
-                      const isPositive = i % 2 === 0
+                      const isPositive = parseFloat(v.variation) > 0
                       return (
                         <TableRow
-                          key={v.plate}
+                          key={v.plate + i}
                           className="border-b border-white/5 hover:bg-white/5 transition-colors duration-300"
                         >
                           <TableCell className="text-[14px] font-normal text-[#ffffff] py-3 pl-0">
@@ -622,7 +716,7 @@ export default function Index() {
                                 <TrendingDown className="w-[16px] h-[16px]" />
                               )}
                               {isPositive ? '+' : '-'}
-                              {v.variation}%
+                              {Math.abs(parseFloat(v.variation)).toFixed(1)}%
                             </div>
                           </TableCell>
                         </TableRow>
@@ -665,8 +759,8 @@ export default function Index() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dtcs.map((d, i) => {
-                    const isPositive = i % 3 !== 0
+                  {dtcs.map((d) => {
+                    const isPositive = d.variation > 0
                     return (
                       <TableRow
                         key={d.desc}
@@ -689,7 +783,7 @@ export default function Index() {
                               <TrendingDown className="w-[16px] h-[16px]" />
                             )}
                             {isPositive ? '+' : '-'}
-                            {(d.count * 1.5 + i).toFixed(1)}%
+                            {Math.abs(d.variation).toFixed(1)}%
                           </div>
                         </TableCell>
                         <TableCell className="py-3 pr-0 text-center">
