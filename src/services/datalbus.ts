@@ -75,34 +75,24 @@ export const checkDatalbusHealth = async () => {
 
   try {
     const res = await pb.send('/backend/v1/datalbus_healthcheck', {
-      method: 'GET',
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
     })
     return res
-  } catch (e: any) {
-    if (e?.status === 404 || e?.status === 405 || e?.status === 400) {
-      try {
-        const res = await pb.send('/backend/v1/datalbus_healthcheck', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-          headers: { 'Content-Type': 'application/json' },
-        })
-        return res
-      } catch (err: any) {
-        if (err?.status === 401 || err?.status === 403 || err?.status === 400) {
-          await authenticateDatalbus()
-          payload = {
-            token: tokenCache!.token,
-            tenancy_id: tokenCache!.tenancy_id,
-          }
-          return pb.send('/backend/v1/datalbus_healthcheck', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-            headers: { 'Content-Type': 'application/json' },
-          })
-        }
-        throw err
+  } catch (err: any) {
+    if (err?.status === 401 || err?.status === 403) {
+      await authenticateDatalbus()
+      payload = {
+        token: tokenCache!.token,
+        tenancy_id: tokenCache!.tenancy_id,
       }
+      return pb.send('/backend/v1/datalbus_healthcheck', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
-    throw e
+    throw err
   }
 }
