@@ -20,47 +20,87 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     await authenticateDatalbus()
   }
 
-  const payload = {
-    token: tokenCache!.token,
-    tenancy_id: tokenCache!.tenancy_id,
-    action,
-    filters,
+  let finalFilters = { ...filters }
+  if (
+    (action === 'trips' || action === 'tripEvents' || action === 'events') &&
+    Object.keys(finalFilters).length === 0
+  ) {
+    const today = new Date()
+    const dateStr = today.toISOString().split('T')[0]
+    finalFilters = {
+      start_date: `${dateStr} 00:00:00`,
+      end_date: `${dateStr} 23:59:59`,
+    }
   }
 
-  try {
-    const res = await pb.send('/backend/v1/busca_dados_datalbus', {
+  const makeRequest = async (endpoint: string, currentToken: string, currentTenancy: string) => {
+    return pb.send(endpoint, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        token: currentToken,
+        tenancy_id: currentTenancy,
+        action,
+        filters: finalFilters,
+      }),
       headers: { 'Content-Type': 'application/json' },
     })
-    return res
+  }
+
+  let res
+  try {
+    res = await makeRequest(
+      '/backend/v1/busca_dados_datalbus',
+      tokenCache!.token,
+      tokenCache!.tenancy_id,
+    )
   } catch (err: any) {
     if (err?.status === 401 || err?.status === 403) {
       await authenticateDatalbus()
-      const res = await pb.send('/backend/v1/busca_dados_datalbus', {
-        method: 'POST',
-        body: JSON.stringify({
-          token: tokenCache!.token,
-          tenancy_id: tokenCache!.tenancy_id,
-          action,
-          filters,
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      })
-      return res
+      try {
+        res = await makeRequest(
+          '/backend/v1/busca_dados_datalbus',
+          tokenCache!.token,
+          tokenCache!.tenancy_id,
+        )
+      } catch (retryErr: any) {
+        if (retryErr?.status === 404) {
+          try {
+            res = await makeRequest(
+              '/backend/v1/buscaDadosDatalbus',
+              tokenCache!.token,
+              tokenCache!.tenancy_id,
+            )
+          } catch (fbErr: any) {
+            if (fbErr?.status === 400)
+              throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+            throw fbErr
+          }
+        } else if (retryErr?.status === 400) {
+          throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+        } else {
+          throw retryErr
+        }
+      }
+    } else if (err?.status === 404) {
+      try {
+        res = await makeRequest(
+          '/backend/v1/buscaDadosDatalbus',
+          tokenCache!.token,
+          tokenCache!.tenancy_id,
+        )
+      } catch (fallbackErr: any) {
+        if (fallbackErr?.status === 400)
+          throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+        throw fallbackErr
+      }
+    } else if (err?.status === 400) {
+      throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+    } else {
+      throw err
     }
-
-    if (err?.status === 404) {
-      const resFallback = await pb.send('/backend/v1/buscaDadosDatalbus', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'application/json' },
-      })
-      return resFallback
-    }
-
-    throw err
   }
+
+  return res
 }
 
 export const checkDatalbusHealth = async () => {

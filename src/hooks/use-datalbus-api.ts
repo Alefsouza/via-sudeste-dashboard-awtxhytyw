@@ -62,7 +62,19 @@ export function useDatalbusApi<T extends DatalbusAction>(
 
   const filtersKey = JSON.stringify(filters || {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stableFilters = useMemo(() => filters || {}, [filtersKey])
+  const stableFilters = useMemo(() => {
+    const finalFilters = { ...(filters || {}) } as Record<string, unknown>
+    if (
+      (action === 'trips' || action === 'tripEvents' || action === 'events') &&
+      Object.keys(finalFilters).length === 0
+    ) {
+      const today = new Date()
+      const dateStr = today.toISOString().split('T')[0]
+      finalFilters.start_date = `${dateStr} 00:00:00`
+      finalFilters.end_date = `${dateStr} 23:59:59`
+    }
+    return finalFilters
+  }, [filtersKey, action])
 
   const authenticate = useCallback(async () => {
     try {
@@ -127,6 +139,8 @@ export function useDatalbusApi<T extends DatalbusAction>(
           if (newAuth) {
             await fetchData(newAuth.token, newAuth.tenancy_id, currentAction, currentFilters, true)
           }
+        } else if (err instanceof ClientResponseError && err.status === 400) {
+          setError('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
         } else {
           setError('Erro ao buscar dados. Tente novamente.')
         }
