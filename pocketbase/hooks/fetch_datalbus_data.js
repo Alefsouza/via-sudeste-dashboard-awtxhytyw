@@ -1,4 +1,3 @@
-// @deps date-fns@4.1.0, date-fns-tz@3.1.3
 routerAdd('OPTIONS', '/backend/v1/fetchDatalbusData', (e) => {
   e.response.header().set('Access-Control-Allow-Origin', '*')
   e.response.header().set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -10,9 +9,6 @@ routerAdd(
   'POST',
   '/backend/v1/fetchDatalbusData',
   (e) => {
-    const { parseISO } = require('date-fns')
-    const { formatInTimeZone } = require('date-fns-tz')
-
     const startTime = Date.now()
 
     const baseUrl = $secrets.get('DATALBUS_BASE_URL')
@@ -273,8 +269,16 @@ routerAdd(
       const normalizeDate = (isoStr) => {
         if (!isoStr) return null
         try {
-          const d = parseISO(isoStr)
-          return formatInTimeZone(d, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ssXXX")
+          const d = new Date(isoStr)
+          if (isNaN(d.getTime())) return isoStr
+          const spTime = new Date(d.getTime() - 3 * 60 * 60 * 1000)
+          const yyyy = spTime.getUTCFullYear()
+          const mm = String(spTime.getUTCMonth() + 1).padStart(2, '0')
+          const dd = String(spTime.getUTCDate()).padStart(2, '0')
+          const hh = String(spTime.getUTCHours()).padStart(2, '0')
+          const min = String(spTime.getUTCMinutes()).padStart(2, '0')
+          const ss = String(spTime.getUTCSeconds()).padStart(2, '0')
+          return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}-03:00`
         } catch (e) {
           return isoStr
         }
