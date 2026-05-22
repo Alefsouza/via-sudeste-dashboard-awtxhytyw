@@ -5,7 +5,8 @@ let tokenCache: { token: string; tenancy_id: string } | null = null
 export const authenticateDatalbus = async () => {
   const res = await pb.send('/backend/v1/autenticacao_datalbus', {
     method: 'POST',
-    body: {},
+    body: JSON.stringify({}),
+    headers: { 'Content-Type': 'application/json' },
   })
   if (res?.success && res?.token && res?.tenancy_id) {
     tokenCache = { token: res.token, tenancy_id: res.tenancy_id }
@@ -38,8 +39,8 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     const dateStr = `${year}-${month}-${day}`
 
     finalFilters = {
-      start_date: `${dateStr} 00:00:00`,
-      end_date: `${dateStr} 23:59:59`,
+      start_date: `${dateStr}T00:00:00`,
+      end_date: `${dateStr}T23:59:59`,
     }
   }
 
@@ -56,7 +57,8 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
 
     return pb.send(endpoint, {
       method: 'POST',
-      body: payload,
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
     })
   }
 
@@ -130,7 +132,8 @@ export const checkDatalbusHealth = async () => {
   try {
     const res = await pb.send('/backend/v1/datalbus_healthcheck', {
       method: 'POST',
-      body: payload,
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
     })
     return res
   } catch (err: any) {
@@ -142,7 +145,8 @@ export const checkDatalbusHealth = async () => {
       }
       return pb.send('/backend/v1/datalbus_healthcheck', {
         method: 'POST',
-        body: payload,
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
       })
     }
     throw err
