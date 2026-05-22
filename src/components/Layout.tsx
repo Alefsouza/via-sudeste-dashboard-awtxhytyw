@@ -9,6 +9,7 @@ import {
   FileBarChart,
   LogOut,
   Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -62,6 +63,9 @@ export default function Layout() {
     { name: 'Painel Geral', href: '/', icon: LayoutDashboard },
     { name: 'Frota', href: '/frota', icon: Truck },
     { name: 'Motoristas', href: '/motoristas', icon: Users },
+    ...(user?.role === 'admin'
+      ? [{ name: 'Sincronismo', href: '/sincronismo', icon: RefreshCw }]
+      : []),
   ]
 
   return (

@@ -11,6 +11,7 @@ import Index from '@/pages/Index'
 import Vehicles from '@/pages/Vehicles'
 import VehicleDetail from '@/pages/VehicleDetail'
 import Drivers from '@/pages/Drivers'
+import SyncDashboard from '@/pages/SyncDashboard'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/frota" element={<Vehicles />} />
               <Route path="/frota/:id" element={<VehicleDetail />} />
               <Route path="/motoristas" element={<Drivers />} />
+              <Route path="/sincronismo" element={<SyncDashboard />} />
             </Route>
           </Route>
 
