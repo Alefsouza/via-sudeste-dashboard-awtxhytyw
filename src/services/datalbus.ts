@@ -35,8 +35,8 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     const today = new Date()
     const dateStr = today.toISOString().split('T')[0]
     finalFilters = {
-      start_date: `${dateStr}T00:00:00Z`,
-      end_date: `${dateStr}T23:59:59Z`,
+      start_date: `${dateStr} 00:00:00`,
+      end_date: `${dateStr} 23:59:59`,
     }
   }
 
