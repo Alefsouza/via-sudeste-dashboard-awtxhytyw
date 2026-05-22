@@ -34,6 +34,8 @@ routerAdd(
       })
     }
 
+    const globalStart = Date.now()
+
     const wait = (ms) => {
       const start = Date.now()
       while (Date.now() - start < ms) {
@@ -51,11 +53,32 @@ routerAdd(
     let lastErrorMsg = ''
 
     while (attempt < maxAttempts) {
+      const elapsed = Date.now() - globalStart
+      if (elapsed >= 30000) {
+        return e.json(408, {
+          success: false,
+          error: 'Tempo limite da requisição excedido (30s)',
+          statusCode: 408,
+          action: action,
+        })
+      }
+
       if (delays[attempt] > 0) {
         wait(delays[attempt])
       }
 
+      const elapsedAfterWait = Date.now() - globalStart
+      if (elapsedAfterWait >= 30000) {
+        return e.json(408, {
+          success: false,
+          error: 'Tempo limite da requisição excedido (30s)',
+          statusCode: 408,
+          action: action,
+        })
+      }
+
       try {
+        const remainingTime = Math.max(1, 30 - Math.floor(elapsedAfterWait / 1000))
         res = $http.send({
           url: url,
           method: 'GET',
@@ -63,7 +86,7 @@ routerAdd(
             Authorization: 'Bearer ' + token,
             Accept: 'application/json',
           },
-          timeout: 30,
+          timeout: remainingTime,
         })
 
         lastStatusCode = res.statusCode
