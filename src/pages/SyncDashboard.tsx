@@ -35,7 +35,13 @@ import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
 import { checkDatalbusHealth, fetchDatalbusAction } from '@/services/datalbus'
-import { getSyncLogs, createSyncLog, clearSyncLogs, SyncLog } from '@/services/sync'
+import {
+  getSyncLogs,
+  createSyncLog,
+  clearSyncLogs,
+  processSyncData,
+  SyncLog,
+} from '@/services/sync'
 import { useRealtime } from '@/hooks/use-realtime'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
@@ -118,13 +124,16 @@ export default function SyncDashboard() {
           const res = await fetchDatalbusAction(t)
           if (res?.data && Array.isArray(res.data)) {
             totalRecords += res.data.length
+            await processSyncData(t, res.data)
           }
         }
       } else {
         const actionMap: any = { events: 'tripEvents' }
-        const res = await fetchDatalbusAction(actionMap[type] || type)
+        const mappedAction = actionMap[type] || type
+        const res = await fetchDatalbusAction(mappedAction)
         if (res?.data && Array.isArray(res.data)) {
           totalRecords = res.data.length
+          await processSyncData(mappedAction, res.data)
         }
       }
 
@@ -144,7 +153,7 @@ export default function SyncDashboard() {
     } catch (e: any) {
       const duration_ms = Date.now() - start
       const errorMessage =
-        e.response?.message || e.response?.error || e.message || 'Erro desconhecido'
+        e.response?.error || e.response?.message || e.message || 'Erro desconhecido'
       await createSyncLog({
         type,
         status: 'error',

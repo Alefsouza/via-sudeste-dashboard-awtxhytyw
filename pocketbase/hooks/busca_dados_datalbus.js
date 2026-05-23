@@ -31,7 +31,7 @@ routerAdd(
       assets: baseUrl + '/assets',
       drivers: baseUrl + '/drivers',
       trips: baseUrl + '/trips',
-      tripEvents: baseUrl + '/events',
+      tripEvents: baseUrl + '/trip-events',
     }
 
     const url = endpoints[action]
@@ -126,6 +126,13 @@ routerAdd(
             statusCode: 401,
             action: action,
           })
+        } else if (res.statusCode === 404) {
+          return e.json(404, {
+            success: false,
+            error: 'Rota externa não encontrada no provedor (404)',
+            statusCode: 404,
+            action: action,
+          })
         } else {
           let extErrorMsg = 'Erro na API externa: ' + res.statusCode
           try {
@@ -218,6 +225,7 @@ routerAdd(
       } else if (action === 'tripEvents') {
         obj = {
           id: item.id,
+          vehicle_id: item.vehicle_id,
           event_type: item.event_type,
           severity: item.severity,
           timestamp: item.timestamp,
