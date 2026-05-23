@@ -27,15 +27,8 @@ routerAdd(
       baseUrl = baseUrl.slice(0, -1)
     }
 
-    const endpoints = {
-      assets: baseUrl + '/assets',
-      drivers: baseUrl + '/drivers',
-      trips: baseUrl + '/trips',
-      tripEvents: baseUrl + '/trip-events',
-    }
-
-    const url = endpoints[action]
-    if (!url) {
+    const validActions = ['assets', 'drivers', 'trips', 'tripEvents']
+    if (!validActions.includes(action)) {
       return e.json(400, {
         success: false,
         error: 'Ação inválida. Ações permitidas: assets, drivers, trips, tripEvents',
@@ -48,150 +41,145 @@ routerAdd(
 
     const wait = (ms) => {
       const start = Date.now()
-      while (Date.now() - start < ms) {
-        // delay loop
-      }
+      while (Date.now() - start < ms) {}
     }
 
-    const delays = [0, 2000, 4000, 8000]
-    const maxAttempts = 4
-    let attempt = 0
-
-    let success = false
-    let res
-    let lastStatusCode = 500
-    let lastErrorMsg = ''
-
-    while (attempt < maxAttempts) {
-      const elapsed = Date.now() - globalStart
-      if (elapsed >= 30000) {
-        return e.json(408, {
-          success: false,
-          error: 'Tempo limite da requisição excedido (30s)',
-          statusCode: 408,
-          action: action,
-        })
+    const fetchDatalbus = (path, extraFilters = {}) => {
+      let finalUrl = baseUrl + path
+      const allFilters = { ...filters, ...extraFilters }
+      if (Object.keys(allFilters).length > 0) {
+        const queryParams = []
+        for (const key in allFilters) {
+          queryParams.push(encodeURIComponent(key) + '=' + encodeURIComponent(allFilters[key]))
+        }
+        finalUrl += (finalUrl.includes('?') ? '&' : '?') + queryParams.join('&')
       }
 
-      if (delays[attempt] > 0) {
-        wait(delays[attempt])
-      }
+      const delays = [0, 2000, 4000]
+      let attempt = 0
+      let lastRes = null
 
-      const elapsedAfterWait = Date.now() - globalStart
-      if (elapsedAfterWait >= 30000) {
-        return e.json(408, {
-          success: false,
-          error: 'Tempo limite da requisição excedido (30s)',
-          statusCode: 408,
-          action: action,
-        })
-      }
+      while (attempt < 3) {
+        const elapsed = Date.now() - globalStart
+        if (elapsed >= 55000) {
+          throw new Error('TIMEOUT')
+        }
 
-      try {
-        const remainingTime = Math.max(1, 30 - Math.floor(elapsedAfterWait / 1000))
+        if (delays[attempt] > 0) wait(delays[attempt])
 
-        let finalUrl = url
-        if (filters && Object.keys(filters).length > 0) {
-          const queryParams = []
-          for (const key in filters) {
-            queryParams.push(encodeURIComponent(key) + '=' + encodeURIComponent(filters[key]))
+        try {
+          const res = $http.send({
+            url: finalUrl,
+            method: 'GET',
+            headers: {
+              Authorization: 'Bearer ' + token,
+              Accept: 'application/json',
+              'X-Tenancy': tenancy_id,
+            },
+            timeout: 15,
+          })
+
+          lastRes = res
+          if (res.statusCode === 200) {
+            return res.json
+          } else if (res.statusCode === 429) {
+            attempt++
+            continue
+          } else if (res.statusCode === 401) {
+            throw new Error('UNAUTHORIZED')
+          } else if (res.statusCode === 404) {
+            throw new Error('NOT_FOUND')
+          } else {
+            throw new Error(`HTTP_${res.statusCode}`)
           }
-          finalUrl += '?' + queryParams.join('&')
-        }
-
-        res = $http.send({
-          url: finalUrl,
-          method: 'GET',
-          headers: {
-            Authorization: 'Bearer ' + token,
-            Accept: 'application/json',
-            'X-Tenancy': tenancy_id,
-          },
-          timeout: remainingTime,
-        })
-
-        lastStatusCode = res.statusCode
-
-        if (res.statusCode === 200) {
-          success = true
-          break
-        } else if (res.statusCode === 429) {
-          lastErrorMsg = 'Muitas requisições (Rate Limit)'
+        } catch (err) {
+          if (
+            err.message === 'TIMEOUT' ||
+            err.message === 'UNAUTHORIZED' ||
+            err.message === 'NOT_FOUND'
+          ) {
+            throw err
+          }
           attempt++
-          continue
-        } else if (res.statusCode === 401) {
-          return e.json(401, {
-            success: false,
-            error: 'Token expirado ou inválido',
-            statusCode: 401,
-            action: action,
-          })
-        } else if (res.statusCode === 404) {
-          return e.json(404, {
-            success: false,
-            error: 'Rota externa não encontrada no provedor (404)',
-            statusCode: 404,
-            action: action,
-          })
-        } else {
-          let extErrorMsg = 'Erro na API externa: ' + res.statusCode
-          try {
-            if (res.json && res.json.errors) {
-              extErrorMsg =
-                'Erro de validação (schema): ' +
-                (typeof res.json.errors === 'object'
-                  ? JSON.stringify(res.json.errors)
-                  : res.json.errors)
-            } else if (res.json && res.json.message) {
-              extErrorMsg = res.json.message
-            } else if (res.json && res.json.error) {
-              extErrorMsg = res.json.error
-            }
-          } catch (err) {}
-
-          return e.json(res.statusCode, {
-            success: false,
-            error: extErrorMsg,
-            statusCode: res.statusCode,
-            action: action,
-          })
         }
-      } catch (err) {
-        return e.json(500, {
-          success: false,
-          error: 'Falha de conectividade com o servidor externo',
-          statusCode: 500,
-          action: action,
-        })
       }
+      throw new Error(lastRes ? `HTTP_${lastRes.statusCode}` : 'NETWORK_ERROR')
     }
 
-    if (!success) {
-      return e.json(lastStatusCode, {
-        success: false,
-        error: lastErrorMsg,
-        statusCode: lastStatusCode,
-        action: action,
-      })
+    const extractData = (parsed) => {
+      if (!parsed) return []
+      if (Array.isArray(parsed)) return parsed
+      if (Array.isArray(parsed.data)) return parsed.data
+      if (typeof parsed === 'object') return [parsed]
+      return []
     }
 
     let rawData = []
+
     try {
-      const parsed = res.json
-      if (Array.isArray(parsed)) {
-        rawData = parsed
-      } else if (parsed && Array.isArray(parsed.data)) {
-        rawData = parsed.data
-      } else if (parsed && typeof parsed === 'object') {
-        rawData = [parsed]
+      if (action === 'tripEvents') {
+        // To fetch events correctly from Datalbus, we must first fetch trips
+        // and then fetch events for each trip (/trips/{id}/events).
+        const tripsRes = fetchDatalbus('/trips', { per_page: 100 })
+        const tripsData = extractData(tripsRes)
+
+        let allEvents = []
+        for (const trip of tripsData) {
+          if (trip && trip.id) {
+            try {
+              const eventsRes = fetchDatalbus(`/trips/${trip.id}/events`, { per_page: 100 })
+              const eventsData = extractData(eventsRes)
+              // Ensure we associate the event with its vehicle if missing
+              const eventsWithVehicle = eventsData.map((e) => ({
+                ...e,
+                vehicle_id: e.vehicle_id || trip.vehicle_id,
+              }))
+              allEvents = allEvents.concat(eventsWithVehicle)
+            } catch (err) {
+              // Ignore individual trip fetch errors to allow partial sync
+            }
+          }
+        }
+        rawData = allEvents
+      } else {
+        const endpointMap = {
+          assets: '/assets',
+          drivers: '/drivers',
+          trips: '/trips',
+        }
+        const parsed = fetchDatalbus(endpointMap[action], { per_page: 100 })
+        rawData = extractData(parsed)
       }
     } catch (err) {
-      return e.json(500, {
-        success: false,
-        error: 'Erro ao processar a resposta da API',
-        statusCode: 500,
-        action: action,
-      })
+      if (err.message === 'TIMEOUT') {
+        return e.json(408, {
+          success: false,
+          error: 'Tempo limite da requisição excedido',
+          statusCode: 408,
+          action,
+        })
+      } else if (err.message === 'UNAUTHORIZED') {
+        return e.json(401, {
+          success: false,
+          error: 'Token expirado ou inválido',
+          statusCode: 401,
+          action,
+        })
+      } else if (err.message === 'NOT_FOUND') {
+        return e.json(404, {
+          success: false,
+          error: 'Rota externa não encontrada no provedor (404)',
+          statusCode: 404,
+          action,
+        })
+      } else {
+        return e.json(500, {
+          success: false,
+          error: 'Erro ao processar a resposta da API ou falha de conectividade',
+          statusCode: 500,
+          action,
+        })
+      }
     }
 
     let normalizedData = []
@@ -226,10 +214,12 @@ routerAdd(
         obj = {
           id: item.id,
           vehicle_id: item.vehicle_id,
-          event_type: item.event_type,
-          severity: item.severity,
-          timestamp: item.timestamp,
-          description: item.description,
+          event_type: item.event_type || item.event_type_description,
+          severity: item.severity || 'low',
+          timestamp: item.timestamp || item.event_time,
+          description: item.description || item.event_type_description,
+          latitude: item.latitude,
+          longitude: item.longitude,
         }
       }
       normalizedData.push(obj)
