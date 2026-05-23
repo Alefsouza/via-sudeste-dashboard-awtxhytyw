@@ -153,7 +153,7 @@ export default function Index() {
     if (!isRetry) {
       try {
         const healthAbort = new AbortController()
-        const healthTimeout = setTimeout(() => healthAbort.abort(), 10000)
+        const healthTimeout = setTimeout(() => healthAbort.abort(), 30000)
         const healthRes = await pb.send('/backend/v1/datalbus_healthcheck', {
           method: 'POST',
           headers: {
@@ -202,13 +202,13 @@ export default function Index() {
     const payload = {
       start_date: currentFilters.startDate,
       end_date: currentFilters.endDate,
-      garage: currentFilters.garage,
-      event: currentFilters.event,
-      eventType: currentFilters.eventType,
+      garage: currentFilters.garage === 'Todos' ? '' : currentFilters.garage,
+      event: currentFilters.event === 'Todos' ? '' : currentFilters.event,
+      eventType: currentFilters.eventType === 'Todos' ? '' : currentFilters.eventType,
     }
 
     const fetchAbort = new AbortController()
-    const fetchTimeout = setTimeout(() => fetchAbort.abort(), 10000)
+    const fetchTimeout = setTimeout(() => fetchAbort.abort(), 120000)
 
     try {
       const res = await pb.send('/backend/v1/fetchDatalbusData', {
