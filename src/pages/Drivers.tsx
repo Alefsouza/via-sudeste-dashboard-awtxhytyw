@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getDrivers } from '@/services/drivers'
 import { RecordModel } from 'pocketbase'
 import { Loader2, Award, FileText } from 'lucide-react'
+import { useRealtime } from '@/hooks/use-realtime'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -11,12 +12,20 @@ export default function Drivers() {
   const [drivers, setDrivers] = useState<RecordModel[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const loadData = () => {
     getDrivers()
       .then(setDrivers)
       .catch(() => {})
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
   }, [])
+
+  useRealtime('drivers', () => {
+    loadData()
+  })
 
   if (loading) {
     return (
@@ -85,16 +94,14 @@ export default function Drivers() {
 
                 <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-border/50">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Distância (Mês)</p>
+                    <p className="text-xs text-muted-foreground mb-1">CNH</p>
                     <p className="font-mono-num font-medium text-sm">
-                      {Math.floor(Math.random() * 5000 + 1000)} km
+                      {driver.license_number || '-'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Incidentes</p>
-                    <p className="font-mono-num font-medium text-sm">
-                      {score > 90 ? '0' : score > 80 ? '2' : '5+'}
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-1">Score</p>
+                    <p className="font-mono-num font-medium text-sm">{score}/100</p>
                   </div>
                 </div>
               </CardContent>

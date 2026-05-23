@@ -99,6 +99,7 @@ export default function Vehicles() {
               <TableRow>
                 <TableHead className="w-[120px]">Placa</TableHead>
                 <TableHead>Modelo</TableHead>
+                <TableHead>Garagem</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Última Posição</TableHead>
                 <TableHead className="text-right">Ação</TableHead>
@@ -128,6 +129,7 @@ export default function Vehicles() {
                       {vehicle.plate}
                     </TableCell>
                     <TableCell>{vehicle.model || '-'}</TableCell>
+                    <TableCell>{vehicle.garage || '-'}</TableCell>
                     <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
                       {vehicle.last_latitude ? (
