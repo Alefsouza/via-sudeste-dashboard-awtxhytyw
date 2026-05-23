@@ -153,7 +153,11 @@ export default function SyncDashboard() {
     } catch (e: any) {
       const duration_ms = Date.now() - start
       const errorMessage =
-        e.response?.error || e.response?.message || e.message || 'Erro desconhecido'
+        e.response?.data?.error ||
+        e.response?.error ||
+        e.response?.message ||
+        e.message ||
+        'Erro desconhecido'
       await createSyncLog({
         type,
         status: 'error',

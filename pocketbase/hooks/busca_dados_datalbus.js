@@ -53,7 +53,7 @@ routerAdd(
 
     const fetchDatalbus = (path, extraFilters = {}) => {
       let finalUrl = baseUrl + path
-      const allFilters = { ...filters, ...extraFilters }
+      const allFilters = Object.assign({}, filters, extraFilters)
 
       // Do not send start_date and end_date directly if unsupported, use date instead if needed
       if (path === '/trips' || path.includes('/events')) {
@@ -182,10 +182,11 @@ routerAdd(
               )
 
               // Ensure we associate the event with its vehicle if missing
-              const eventsWithVehicle = validEvents.map((e) => ({
-                ...e,
-                vehicle_id: e.vehicle_id || trip.vehicle_id,
-              }))
+              const eventsWithVehicle = validEvents.map((e) =>
+                Object.assign({}, e, {
+                  vehicle_id: e.vehicle_id || trip.vehicle_id,
+                }),
+              )
               allEvents = allEvents.concat(eventsWithVehicle)
             } catch (err) {
               // Ignore individual trip fetch errors to allow partial sync

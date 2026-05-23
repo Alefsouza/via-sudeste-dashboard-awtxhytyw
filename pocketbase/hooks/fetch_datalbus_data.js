@@ -351,41 +351,38 @@ routerAdd(
       const assets = rawAssets
         .map((a) => {
           if (!a || typeof a !== 'object') return null
-          return {
-            ...a,
+          return Object.assign({}, a, {
             asset_id: a.asset_id ? parseInt(a.asset_id, 10) : null,
             license_plate: a.license_plate === null ? '' : a.license_plate,
-          }
+          })
         })
         .filter(Boolean)
 
       const drivers = rawDrivers
         .map((d) => {
           if (!d || typeof d !== 'object') return null
-          return { ...d }
+          return Object.assign({}, d)
         })
         .filter(Boolean)
 
       const trips = rawTrips
         .map((t) => {
           if (!t || typeof t !== 'object') return null
-          return {
-            ...t,
+          return Object.assign({}, t, {
             start_time: normalizeDate(t.start_time),
             end_time: normalizeDate(t.end_time),
-          }
+          })
         })
         .filter(Boolean)
 
       const tripEvents = rawTripEvents
         .map((e) => {
           if (!e || typeof e !== 'object') return null
-          return {
-            ...e,
+          return Object.assign({}, e, {
             latitude: e.latitude ? parseFloat(e.latitude) : null,
             longitude: e.longitude ? parseFloat(e.longitude) : null,
             event_time: normalizeDate(e.event_time),
-          }
+          })
         })
         .filter(Boolean)
 
@@ -434,12 +431,11 @@ routerAdd(
       const prevTripEventsNormalized = prevTripEvents
         .map((e) => {
           if (!e || typeof e !== 'object') return null
-          return {
-            ...e,
+          return Object.assign({}, e, {
             latitude: e.latitude ? parseFloat(e.latitude) : null,
             longitude: e.longitude ? parseFloat(e.longitude) : null,
             event_time: normalizeDate(e.event_time),
-          }
+          })
         })
         .filter(Boolean)
 
