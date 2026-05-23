@@ -39,8 +39,15 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     const dateStr = `${year}-${month}-${day}`
 
     finalFilters = {
-      start_date: `${dateStr}T00:00:00`,
-      end_date: `${dateStr}T23:59:59`,
+      start_date: `${dateStr} 00:00:00`,
+      end_date: `${dateStr} 23:59:59`,
+    }
+  } else {
+    if (typeof finalFilters.start_date === 'string') {
+      finalFilters.start_date = finalFilters.start_date.replace('T', ' ')
+    }
+    if (typeof finalFilters.end_date === 'string') {
+      finalFilters.end_date = finalFilters.end_date.replace('T', ' ')
     }
   }
 
@@ -53,6 +60,7 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
 
     if (Object.keys(finalFilters).length > 0) {
       payload.filters = finalFilters
+      Object.assign(payload, finalFilters)
     }
 
     return pb.send(endpoint, {

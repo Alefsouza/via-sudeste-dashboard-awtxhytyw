@@ -8,6 +8,10 @@ routerAdd(
     const action = body.action
     const filters = body.filters || {}
 
+    // Ensure start_date and end_date are picked from body if not in filters
+    if (body.start_date && !filters.start_date) filters.start_date = body.start_date
+    if (body.end_date && !filters.end_date) filters.end_date = body.end_date
+
     if (!token || !tenancy_id || !action) {
       return e.json(400, {
         success: false,

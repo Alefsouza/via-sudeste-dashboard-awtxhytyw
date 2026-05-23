@@ -73,8 +73,15 @@ export function useDatalbusApi<T extends DatalbusAction>(
       const month = String(today.getMonth() + 1).padStart(2, '0')
       const day = String(today.getDate()).padStart(2, '0')
       const dateStr = `${year}-${month}-${day}`
-      finalFilters.start_date = `${dateStr}T00:00:00`
-      finalFilters.end_date = `${dateStr}T23:59:59`
+      finalFilters.start_date = `${dateStr} 00:00:00`
+      finalFilters.end_date = `${dateStr} 23:59:59`
+    } else {
+      if (typeof finalFilters.start_date === 'string') {
+        finalFilters.start_date = finalFilters.start_date.replace('T', ' ')
+      }
+      if (typeof finalFilters.end_date === 'string') {
+        finalFilters.end_date = finalFilters.end_date.replace('T', ' ')
+      }
     }
     return finalFilters
   }, [filtersKey, action])
@@ -119,6 +126,7 @@ export function useDatalbusApi<T extends DatalbusAction>(
         }
         if (Object.keys(currentFilters).length > 0) {
           payload.filters = currentFilters
+          Object.assign(payload, currentFilters)
         }
 
         const res = await pb.send('/backend/v1/buscaDadosDatalbus', {
