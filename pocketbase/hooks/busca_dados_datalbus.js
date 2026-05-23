@@ -13,6 +13,13 @@ routerAdd(
     if (body.start_date && !filters.start_date) filters.start_date = body.start_date
     if (body.end_date && !filters.end_date) filters.end_date = body.end_date
 
+    // Provide default date as specified in requirements
+    if (!filters.date && !filters.start_date && !filters.end_date) {
+      filters.date = '2026-05-23'
+      filters.start_date = '2026-05-23'
+      filters.end_date = '2026-05-23'
+    }
+
     if (!token || !tenancy_id || !action) {
       return e.json(400, {
         success: false,
@@ -47,6 +54,13 @@ routerAdd(
     const fetchDatalbus = (path, extraFilters = {}) => {
       let finalUrl = baseUrl + path
       const allFilters = { ...filters, ...extraFilters }
+
+      // Do not send start_date and end_date directly if unsupported, use date instead if needed
+      if (path === '/trips' || path.includes('/events')) {
+        delete allFilters.start_date
+        delete allFilters.end_date
+      }
+
       if (Object.keys(allFilters).length > 0) {
         const queryParams = []
         for (const key in allFilters) {
@@ -90,7 +104,8 @@ routerAdd(
           } else if (res.statusCode === 404) {
             throw new Error('NOT_FOUND')
           } else {
-            throw new Error(`HTTP_${res.statusCode}`)
+            const errorDetail = res.json?.message || res.json?.error || `HTTP_${res.statusCode}`
+            throw new Error(errorDetail)
           }
         } catch (err) {
           if (
@@ -103,14 +118,21 @@ routerAdd(
           attempt++
         }
       }
-      throw new Error(lastRes ? `HTTP_${lastRes.statusCode}` : 'NETWORK_ERROR')
+      throw new Error(
+        lastRes ? `HTTP_${lastRes.statusCode} - falha de conexão após tentativas` : 'NETWORK_ERROR',
+      )
     }
 
     const extractData = (parsed) => {
       if (!parsed) return []
       if (Array.isArray(parsed)) return parsed
       if (Array.isArray(parsed.data)) return parsed.data
-      if (typeof parsed === 'object') return [parsed]
+      if (typeof parsed === 'object') {
+        if (parsed.message || parsed.error) {
+          return []
+        }
+        return [parsed]
+      }
       return []
     }
 
@@ -120,8 +142,29 @@ routerAdd(
       if (action === 'tripEvents') {
         // To fetch events correctly from Datalbus, we must first fetch trips
         // and then fetch events for each trip (/trips/{id}/events).
-        const tripsRes = fetchDatalbus('/trips', { per_page: 100 })
-        const tripsData = extractData(tripsRes)
+
+        let tripsData = []
+        let startStr = filters.start_date || filters.date
+        let endStr = filters.end_date || filters.date
+
+        if (startStr && endStr) {
+          const start = new Date(startStr)
+          const end = new Date(endStr)
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              const dateStr = d.toISOString().split('T')[0]
+              try {
+                const tripsRes = fetchDatalbus('/trips', { per_page: 100, date: dateStr })
+                tripsData = tripsData.concat(extractData(tripsRes))
+              } catch (e) {
+                // ignore daily failures to allow partial data
+              }
+            }
+          }
+        } else {
+          const tripsRes = fetchDatalbus('/trips', { per_page: 100 })
+          tripsData = extractData(tripsRes)
+        }
 
         let allEvents = []
         for (const trip of tripsData) {
@@ -129,8 +172,17 @@ routerAdd(
             try {
               const eventsRes = fetchDatalbus(`/trips/${trip.id}/events`, { per_page: 100 })
               const eventsData = extractData(eventsRes)
+
+              // Validation step for expected schema
+              const validEvents = eventsData.filter(
+                (e) =>
+                  e &&
+                  typeof e === 'object' &&
+                  (e.id || e.event_type || e.description || e.event_type_description),
+              )
+
               // Ensure we associate the event with its vehicle if missing
-              const eventsWithVehicle = eventsData.map((e) => ({
+              const eventsWithVehicle = validEvents.map((e) => ({
                 ...e,
                 vehicle_id: e.vehicle_id || trip.vehicle_id,
               }))
@@ -175,7 +227,7 @@ routerAdd(
       } else {
         return e.json(500, {
           success: false,
-          error: 'Erro ao processar a resposta da API ou falha de conectividade',
+          error: `Erro ao processar a resposta da API ou falha de conectividade: ${err.message}`,
           statusCode: 500,
           action,
         })
