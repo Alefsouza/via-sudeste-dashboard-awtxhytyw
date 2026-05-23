@@ -38,16 +38,32 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     const day = String(today.getDate()).padStart(2, '0')
     const dateStr = `${year}-${month}-${day}`
 
-    finalFilters = {
-      start_date: dateStr,
-      end_date: dateStr,
+    if (action === 'trips') {
+      finalFilters = {
+        date: dateStr,
+      }
+    } else {
+      finalFilters = {
+        start_date: dateStr,
+        end_date: dateStr,
+      }
     }
   } else {
-    if (typeof finalFilters.start_date === 'string') {
-      finalFilters.start_date = finalFilters.start_date.split('T')[0].split(' ')[0]
-    }
-    if (typeof finalFilters.end_date === 'string') {
-      finalFilters.end_date = finalFilters.end_date.split('T')[0].split(' ')[0]
+    if (action === 'trips') {
+      if (finalFilters.start_date || finalFilters.date) {
+        const sourceDate = finalFilters.date || finalFilters.start_date
+        finalFilters.date =
+          typeof sourceDate === 'string' ? sourceDate.split('T')[0].split(' ')[0] : sourceDate
+        delete finalFilters.start_date
+        delete finalFilters.end_date
+      }
+    } else {
+      if (typeof finalFilters.start_date === 'string') {
+        finalFilters.start_date = finalFilters.start_date.split('T')[0].split(' ')[0]
+      }
+      if (typeof finalFilters.end_date === 'string') {
+        finalFilters.end_date = finalFilters.end_date.split('T')[0].split(' ')[0]
+      }
     }
   }
 
@@ -60,7 +76,6 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
 
     if (Object.keys(finalFilters).length > 0) {
       payload.filters = finalFilters
-      Object.assign(payload, finalFilters)
     }
 
     return pb.send(endpoint, {

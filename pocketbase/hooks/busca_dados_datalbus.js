@@ -8,7 +8,8 @@ routerAdd(
     const action = body.action
     const filters = body.filters || {}
 
-    // Ensure start_date and end_date are picked from body if not in filters
+    // Ensure date, start_date and end_date are picked from body if not in filters
+    if (body.date && !filters.date) filters.date = body.date
     if (body.start_date && !filters.start_date) filters.start_date = body.start_date
     if (body.end_date && !filters.end_date) filters.end_date = body.end_date
 
@@ -225,7 +226,7 @@ routerAdd(
     if (filters && Object.keys(filters).length > 0) {
       normalizedData = normalizedData.filter((item) => {
         for (const key in filters) {
-          if (key === 'start_date' || key === 'end_date') continue
+          if (key === 'start_date' || key === 'end_date' || key === 'date') continue
           if (item[key] !== filters[key]) {
             return false
           }
