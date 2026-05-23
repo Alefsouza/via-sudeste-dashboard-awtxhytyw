@@ -28,54 +28,39 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     }
   })
 
-  if (
-    (action === 'trips' || action === 'tripEvents' || action === 'events') &&
-    Object.keys(finalFilters).length === 0
-  ) {
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0')
-    const day = String(today.getDate()).padStart(2, '0')
-    const dateStr = `${year}-${month}-${day}`
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  const defaultDateStr = `${year}-${month}-${day}`
 
-    if (action === 'trips') {
-      finalFilters = {
-        date: dateStr,
-      }
-    } else {
-      finalFilters = {
-        start_date: dateStr,
-        end_date: dateStr,
-      }
-    }
-  } else {
-    if (action === 'trips') {
-      if (finalFilters.start_date || finalFilters.date) {
-        const sourceDate = finalFilters.date || finalFilters.start_date
-        finalFilters.date =
-          typeof sourceDate === 'string' ? sourceDate.split('T')[0].split(' ')[0] : sourceDate
-        delete finalFilters.start_date
-        delete finalFilters.end_date
-      }
-    } else {
-      if (typeof finalFilters.start_date === 'string') {
-        finalFilters.start_date = finalFilters.start_date.split('T')[0].split(' ')[0]
-      }
-      if (typeof finalFilters.end_date === 'string') {
-        finalFilters.end_date = finalFilters.end_date.split('T')[0].split(' ')[0]
-      }
-    }
+  let dateVal = finalFilters.date || finalFilters.start_date || defaultDateStr
+  if (typeof dateVal === 'string') {
+    dateVal = dateVal.split('T')[0].split(' ')[0]
   }
+
+  let startDateVal = finalFilters.start_date || dateVal
+  if (typeof startDateVal === 'string') {
+    startDateVal = startDateVal.split('T')[0].split(' ')[0]
+  }
+
+  let endDateVal = finalFilters.end_date || dateVal
+  if (typeof endDateVal === 'string') {
+    endDateVal = endDateVal.split('T')[0].split(' ')[0]
+  }
+
+  delete finalFilters.date
+
+  finalFilters.start_date = startDateVal
+  finalFilters.end_date = endDateVal
 
   const makeRequest = async (endpoint: string, currentToken: string, currentTenancy: string) => {
     const payload: Record<string, any> = {
       token: currentToken,
       tenancy_id: currentTenancy,
       action,
-    }
-
-    if (Object.keys(finalFilters).length > 0) {
-      payload.filters = finalFilters
+      date: dateVal,
+      filters: finalFilters,
     }
 
     return pb.send(endpoint, {
@@ -88,7 +73,7 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
   let res
   try {
     res = await makeRequest(
-      '/backend/v1/buscaDadosDatalbus',
+      '/backend/v1/busca_dados_datalbus',
       tokenCache!.token,
       tokenCache!.tenancy_id,
     )
@@ -97,49 +82,18 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
       await authenticateDatalbus()
       try {
         res = await makeRequest(
-          '/backend/v1/buscaDadosDatalbus',
-          tokenCache!.token,
-          tokenCache!.tenancy_id,
-        )
-      } catch (retryErr: any) {
-        if (retryErr?.status === 404) {
-          try {
-            res = await makeRequest(
-              '/backend/v1/busca_dados_datalbus',
-              tokenCache!.token,
-              tokenCache!.tenancy_id,
-            )
-          } catch (fbErr: any) {
-            if (fbErr?.status === 400)
-              throw new Error(
-                fbErr?.response?.error ||
-                  'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
-              )
-            throw fbErr
-          }
-        } else if (retryErr?.status === 400) {
-          throw new Error(
-            retryErr?.response?.error ||
-              'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
-          )
-        } else {
-          throw retryErr
-        }
-      }
-    } else if (err?.status === 404) {
-      try {
-        res = await makeRequest(
           '/backend/v1/busca_dados_datalbus',
           tokenCache!.token,
           tokenCache!.tenancy_id,
         )
-      } catch (fallbackErr: any) {
-        if (fallbackErr?.status === 400)
+      } catch (retryErr: any) {
+        if (retryErr?.status === 400) {
           throw new Error(
-            fallbackErr?.response?.error ||
+            retryErr?.response?.error ||
               'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
           )
-        throw fallbackErr
+        }
+        throw retryErr
       }
     } else if (err?.status === 400) {
       throw new Error(

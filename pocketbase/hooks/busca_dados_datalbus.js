@@ -1,6 +1,6 @@
 routerAdd(
   'POST',
-  '/backend/v1/buscaDadosDatalbus',
+  '/backend/v1/busca_dados_datalbus',
   (e) => {
     const body = e.requestInfo().body || {}
     const token = body.token
