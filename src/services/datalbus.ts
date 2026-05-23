@@ -39,15 +39,15 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
     const dateStr = `${year}-${month}-${day}`
 
     finalFilters = {
-      start_date: `${dateStr} 00:00:00`,
-      end_date: `${dateStr} 23:59:59`,
+      start_date: dateStr,
+      end_date: dateStr,
     }
   } else {
     if (typeof finalFilters.start_date === 'string') {
-      finalFilters.start_date = finalFilters.start_date.replace('T', ' ')
+      finalFilters.start_date = finalFilters.start_date.split('T')[0].split(' ')[0]
     }
     if (typeof finalFilters.end_date === 'string') {
-      finalFilters.end_date = finalFilters.end_date.replace('T', ' ')
+      finalFilters.end_date = finalFilters.end_date.split('T')[0].split(' ')[0]
     }
   }
 
@@ -96,11 +96,17 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
             )
           } catch (fbErr: any) {
             if (fbErr?.status === 400)
-              throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+              throw new Error(
+                fbErr?.response?.error ||
+                  'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
+              )
             throw fbErr
           }
         } else if (retryErr?.status === 400) {
-          throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+          throw new Error(
+            retryErr?.response?.error ||
+              'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
+          )
         } else {
           throw retryErr
         }
@@ -114,11 +120,16 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
         )
       } catch (fallbackErr: any) {
         if (fallbackErr?.status === 400)
-          throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+          throw new Error(
+            fallbackErr?.response?.error ||
+              'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
+          )
         throw fallbackErr
       }
     } else if (err?.status === 400) {
-      throw new Error('Parâmetros ausentes ou inválidos. Verifique os filtros de data.')
+      throw new Error(
+        err?.response?.error || 'Parâmetros ausentes ou inválidos. Verifique os filtros de data.',
+      )
     } else {
       throw err
     }

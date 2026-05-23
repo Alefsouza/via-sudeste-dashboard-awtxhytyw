@@ -104,6 +104,7 @@ routerAdd(
           headers: {
             Authorization: 'Bearer ' + token,
             Accept: 'application/json',
+            'X-Tenancy': tenancy_id,
           },
           timeout: remainingTime,
         })
@@ -125,9 +126,20 @@ routerAdd(
             action: action,
           })
         } else {
+          let extErrorMsg = 'Erro na API externa: ' + res.statusCode
+          try {
+            if (res.json && res.json.message) {
+              extErrorMsg = res.json.message
+            } else if (res.json && res.json.error) {
+              extErrorMsg = res.json.error
+            } else if (res.json && res.json.errors) {
+              extErrorMsg = JSON.stringify(res.json.errors)
+            }
+          } catch (err) {}
+
           return e.json(res.statusCode, {
             success: false,
-            error: 'Erro na API externa: ' + res.statusCode,
+            error: extErrorMsg,
             statusCode: res.statusCode,
             action: action,
           })
