@@ -35,9 +35,15 @@ export const clearSyncLogs = async () => {
   }
 }
 
-export const triggerSyncDatalbus = async (action: string, token: string, tenancy_id: string) => {
+export const triggerSyncDatalbus = async (
+  action: string,
+  token: string,
+  tenancy_id: string,
+  date?: string,
+) => {
   try {
-    const bodyObj = { action, token, tenancy_id }
+    const bodyObj: Record<string, any> = { action, token, tenancy_id }
+    if (date) bodyObj.date = date
     const body = JSON.stringify(bodyObj)
 
     const controller = new AbortController()

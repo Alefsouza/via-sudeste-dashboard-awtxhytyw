@@ -6,6 +6,7 @@ routerAdd(
     const action = body.action
     const token = body.token
     const tenancyId = body.tenancy_id
+    const date = body.date
 
     if (!action || !['assets', 'drivers', 'trips', 'tripEvents', 'all'].includes(action)) {
       return e.badRequestError(
@@ -17,6 +18,9 @@ routerAdd(
     }
     if (!tenancyId) {
       return e.badRequestError('Tenancy ID ausente.')
+    }
+    if (['trips', 'tripEvents', 'all'].includes(action) && !date) {
+      return e.badRequestError('O campo data é obrigatório para esta sincronização.')
     }
 
     const baseUrl = $secrets.get('DATALBUS_BASE_URL') || 'https://datalbus.com.br:8000/api/v2'
@@ -154,7 +158,7 @@ routerAdd(
       }
 
       if (action === 'trips' || action === 'all') {
-        const data = fetchWithRetry(baseUrl + '/trips')
+        const data = fetchWithRetry(baseUrl + '/trips?date=' + encodeURIComponent(date))
         totalSynced += syncData('trips', 'trip_id', data, (item, txApp) => {
           let vehicleRel = null
           if (item.vehicle_id) {
@@ -182,7 +186,7 @@ routerAdd(
       }
 
       if (action === 'tripEvents' || action === 'all') {
-        const data = fetchWithRetry(baseUrl + '/trip-events')
+        const data = fetchWithRetry(baseUrl + '/trip-events?date=' + encodeURIComponent(date))
         totalSynced += syncData('trip_events', 'event_id', data, (item, txApp) => {
           let tripRel = null
           if (item.trip_id) {

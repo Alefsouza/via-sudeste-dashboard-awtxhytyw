@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Play,
   Activity,
+  CalendarIcon,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
@@ -46,6 +49,7 @@ import {
 import { useRealtime } from '@/hooks/use-realtime'
 import pb from '@/lib/pocketbase/client'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 import type { RecordModel } from 'pocketbase'
 
 export interface AssetRecord extends RecordModel {
@@ -95,6 +99,8 @@ export default function SyncDashboard() {
   const [drivers, setDrivers] = useState<DriverRecord[]>([])
   const [trips, setTrips] = useState<TripRecord[]>([])
   const [events, setEvents] = useState<TripEventRecord[]>([])
+
+  const [syncDate, setSyncDate] = useState<Date | undefined>(new Date())
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -164,6 +170,15 @@ export default function SyncDashboard() {
   }, [checkHealth])
 
   const handleSync = async (type: 'assets' | 'drivers' | 'trips' | 'events' | 'all') => {
+    if (['trips', 'events', 'all'].includes(type) && !syncDate) {
+      toast({
+        title: 'Validação',
+        description: 'O campo data é obrigatório para esta sincronização.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (debounceRef.current) return
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null
@@ -178,6 +193,7 @@ export default function SyncDashboard() {
     const start = Date.now()
     try {
       let totalRecords = 0
+      const formattedDate = syncDate ? format(syncDate, 'yyyy-MM-dd') : undefined
 
       const authRes = await pb.send('/backend/v1/autenticacao_datalbus', {
         method: 'POST',
@@ -194,13 +210,13 @@ export default function SyncDashboard() {
       if (type === 'all') {
         const types = ['assets', 'drivers', 'trips', 'tripEvents']
         for (const t of types) {
-          const res = await triggerSyncDatalbus(t, token, tenancy_id)
+          const res = await triggerSyncDatalbus(t, token, tenancy_id, formattedDate)
           totalRecords += res?.records_count || res?.data?.length || 0
         }
       } else {
         const actionMap: any = { events: 'tripEvents' }
         const mappedAction = actionMap[type] || type
-        const res = await triggerSyncDatalbus(mappedAction, token, tenancy_id)
+        const res = await triggerSyncDatalbus(mappedAction, token, tenancy_id, formattedDate)
         totalRecords = res?.records_count || res?.data?.length || 0
       }
 
@@ -381,6 +397,27 @@ export default function SyncDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-6 flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Data base (Viagens e Eventos)</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={'outline'}
+                    className={cn(
+                      'w-full sm:w-[240px] justify-start text-left font-normal',
+                      !syncDate && 'text-muted-foreground',
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {syncDate ? format(syncDate, 'dd/MM/yyyy') : <span>Selecione uma data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={syncDate} onSelect={setSyncDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {syncButtons.map((btn) => (
                 <Button
