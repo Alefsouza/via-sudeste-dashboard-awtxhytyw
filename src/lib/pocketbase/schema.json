@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-24T03:00:41.755Z",
+  "generatedAt": "2026-05-24T03:07:51.059Z",
   "collections": [
     {
       "name": "users",
@@ -390,11 +390,11 @@
       "name": "sync_logs",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "view": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
       },
       "fields": [
         {
