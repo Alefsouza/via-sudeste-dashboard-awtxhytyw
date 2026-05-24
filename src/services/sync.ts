@@ -35,19 +35,19 @@ export const clearSyncLogs = async () => {
   }
 }
 
-export const processSyncData = async (action?: string, data?: any) => {
+export const triggerSyncDatalbus = async (action: string, token: string, tenancy_id: string) => {
   try {
-    const body = action || data ? JSON.stringify({ action, data }) : undefined
-    const headers = body ? { 'Content-Type': 'application/json' } : undefined
+    const bodyObj = { action, token, tenancy_id }
+    const body = JSON.stringify(bodyObj)
 
-    // Create an AbortController for a 5-minute timeout to prevent browser fetch hangs
     const controller = new AbortController()
+    // Timeout of 5 minutes to prevent browser fetch hangs during long syncs
     const timeoutId = setTimeout(() => controller.abort(), 300000)
 
-    const result = await pb.send('/backend/v1/fetch_datalbus_data', {
+    const result = await pb.send('/backend/v1/sincronizarDatalbus', {
       method: 'POST',
       body,
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       requestKey: null,
     })
@@ -55,7 +55,7 @@ export const processSyncData = async (action?: string, data?: any) => {
     clearTimeout(timeoutId)
     return result
   } catch (error) {
-    console.error('processSyncData error:', error)
+    console.error('triggerSyncDatalbus error:', error)
     throw error
   }
 }
