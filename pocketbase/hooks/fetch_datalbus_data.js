@@ -36,6 +36,94 @@ routerAdd(
 
     const body = e.requestInfo().body || {}
 
+    // Payload validation for sync processing
+    if (body.action && Array.isArray(body.data)) {
+      $app
+        .logger()
+        .info('Processing sync payload', 'action', body.action, 'count', body.data.length)
+
+      let processed = 0
+      let errors = 0
+
+      try {
+        if (body.action === 'assets' || body.action === 'vehicles') {
+          const col = $app.findCollectionByNameOrId('vehicles')
+          $app.runInTransaction((txApp) => {
+            for (const item of body.data) {
+              try {
+                const identifier = item.plate || item.id || item.vehicle_id
+                if (!identifier) continue
+
+                const plate = item.plate ? String(item.plate).trim() : `UNK-${identifier}`
+
+                let record
+                try {
+                  record = txApp.findFirstRecordByData('vehicles', 'plate', plate)
+                } catch (_) {
+                  record = new Record(col)
+                  record.set('plate', plate)
+                }
+
+                if (item.status) {
+                  const s = String(item.status).toLowerCase()
+                  if (s.includes('mov') || s.includes('run')) record.set('status', 'moving')
+                  else if (s.includes('main') || s.includes('manut'))
+                    record.set('status', 'maintenance')
+                  else record.set('status', 'idle')
+                }
+
+                if (item.model) record.set('model', item.model)
+                if (item.garage) record.set('garage', item.garage)
+
+                txApp.save(record)
+                processed++
+              } catch (err) {
+                errors++
+              }
+            }
+          })
+        } else if (body.action === 'drivers') {
+          const col = $app.findCollectionByNameOrId('drivers')
+          $app.runInTransaction((txApp) => {
+            for (const item of body.data) {
+              try {
+                const license = item.license_number || item.cpf || item.id?.toString()
+                if (!license) continue
+
+                let record
+                try {
+                  record = txApp.findFirstRecordByData('drivers', 'license_number', license)
+                } catch (_) {
+                  record = new Record(col)
+                  record.set('license_number', license)
+                }
+
+                if (item.name) record.set('name', item.name)
+                if (item.score !== undefined) record.set('score', Number(item.score))
+
+                txApp.save(record)
+                processed++
+              } catch (err) {
+                errors++
+              }
+            }
+          })
+        } else {
+          // Acknowledge other types without failing
+          processed = body.data.length
+        }
+
+        return e.json(200, { success: true, processed, errors })
+      } catch (err) {
+        $app.logger().error('Sync processing error', 'action', body.action, 'error', err.message)
+        return e.json(500, {
+          success: false,
+          error: 'Erro ao processar dados',
+          code: 'PROCESSING_ERROR',
+        })
+      }
+    }
+
     // Default to today if dates are not provided (e.g. from sync dashboard action payload)
     const todayStr = new Date().toISOString().split('T')[0]
     const startDate = body.start_date || todayStr
@@ -541,4 +629,5 @@ routerAdd(
     }
   },
   $apis.requireAuth(),
+  $apis.bodyLimit(100 * 1024 * 1024),
 )

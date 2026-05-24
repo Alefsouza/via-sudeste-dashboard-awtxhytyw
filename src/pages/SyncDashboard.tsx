@@ -152,22 +152,34 @@ export default function SyncDashboard() {
       })
     } catch (e: any) {
       const duration_ms = Date.now() - start
-      const errorMessage =
-        e.response?.data?.error ||
-        e.response?.error ||
-        e.response?.message ||
-        e.message ||
-        'Erro desconhecido'
-      await createSyncLog({
-        type,
-        status: 'error',
-        records_count: 0,
-        duration_ms,
-        error_message: errorMessage,
-      })
+
+      const isNetworkError =
+        !e.response && (e.message?.includes('Failed to fetch') || e.status === 0 || e.isAbort)
+
+      const errorMessage = isNetworkError
+        ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.'
+        : e.response?.data?.error ||
+          e.response?.error ||
+          e.response?.message ||
+          e.message ||
+          'Erro desconhecido'
+
+      try {
+        await createSyncLog({
+          type,
+          status: 'error',
+          records_count: 0,
+          duration_ms,
+          error_message: errorMessage,
+        })
+      } catch (logErr) {
+        console.error('Falha ao salvar log de erro', logErr)
+      }
+
       toast({
-        title:
-          type === 'events'
+        title: isNetworkError
+          ? 'Servidor Inacessível'
+          : type === 'events'
             ? 'Erro ao sincronizar eventos.'
             : 'Erro ao sincronizar. Tente novamente.',
         description: errorMessage,

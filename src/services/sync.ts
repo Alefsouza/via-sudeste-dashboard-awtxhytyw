@@ -39,13 +39,23 @@ export const processSyncData = async (action?: string, data?: any) => {
   try {
     const body = action || data ? JSON.stringify({ action, data }) : undefined
     const headers = body ? { 'Content-Type': 'application/json' } : undefined
-    return await pb.send('/backend/v1/fetch_datalbus_data', {
+
+    // Create an AbortController for a 5-minute timeout to prevent browser fetch hangs
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 300000)
+
+    const result = await pb.send('/backend/v1/fetch_datalbus_data', {
       method: 'POST',
       body,
       headers,
+      signal: controller.signal,
+      requestKey: null,
     })
+
+    clearTimeout(timeoutId)
+    return result
   } catch (error) {
-    console.error(error)
+    console.error('processSyncData error:', error)
     throw error
   }
 }
