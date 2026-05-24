@@ -1,12 +1,26 @@
 import pb from '@/lib/pocketbase/client'
 import type { RecordModel } from 'pocketbase'
 
-export const getSyncLogs = async (limit = 1) => {
+export interface SyncLog extends RecordModel {
+  type: string
+  status: string
+  records_count: number
+  duration_ms: number
+  error_message?: string
+}
+
+export const getSyncLogs = async (filterType = 'all_records', limit = 100) => {
+  const options: Record<string, any> = {
+    sort: '-created',
+  }
+
+  if (filterType && filterType !== 'all_records') {
+    options.filter = `type = '${filterType}'`
+  }
+
   return await pb
     .collection('sync_logs')
-    .getList<RecordModel>(1, limit, {
-      sort: '-created',
-    })
+    .getList<SyncLog>(1, limit, options)
     .then((res) => res.items)
 }
 
@@ -21,9 +35,15 @@ export const clearSyncLogs = async () => {
   }
 }
 
-export const processSyncData = async () => {
+export const processSyncData = async (action?: string, data?: any) => {
   try {
-    return await pb.send('/backend/v1/fetch_datalbus_data', { method: 'POST' })
+    const body = action || data ? JSON.stringify({ action, data }) : undefined
+    const headers = body ? { 'Content-Type': 'application/json' } : undefined
+    return await pb.send('/backend/v1/fetch_datalbus_data', {
+      method: 'POST',
+      body,
+      headers,
+    })
   } catch (error) {
     console.error(error)
     throw error
