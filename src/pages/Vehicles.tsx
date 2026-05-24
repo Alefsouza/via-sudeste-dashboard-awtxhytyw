@@ -50,8 +50,8 @@ export default function Vehicles() {
 
   const filteredVehicles = vehicles.filter(
     (v) =>
-      v.plate.toLowerCase().includes(search.toLowerCase()) ||
-      v.model?.toLowerCase().includes(search.toLowerCase()),
+      (v.plate || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.model || '').toLowerCase().includes(search.toLowerCase()),
   )
 
   const getStatusBadge = (status: string) => {
@@ -145,7 +145,7 @@ export default function Vehicles() {
                     onClick={() => navigate(`/frota/${vehicle.id}`)}
                   >
                     <TableCell className="font-mono-num font-medium text-primary group-hover:underline underline-offset-4">
-                      {vehicle.plate}
+                      {vehicle.plate || 'Sem placa'}
                     </TableCell>
                     <TableCell>{vehicle.model || '-'}</TableCell>
                     <TableCell>{vehicle.garage || '-'}</TableCell>

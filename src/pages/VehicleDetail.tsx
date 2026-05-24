@@ -97,7 +97,7 @@ export default function VehicleDetail() {
         </Button>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono-num flex items-center gap-3">
-            {vehicle.plate}
+            {vehicle.plate || 'Sem placa'}
             {vehicle.status === 'moving' && (
               <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
                 Em Trânsito

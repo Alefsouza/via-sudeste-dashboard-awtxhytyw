@@ -79,12 +79,9 @@ export default function SyncDashboard() {
 
   const clearLogs = () => setLogs([])
 
-  const validateItem = (type: string, item: any) => {
+  const validateItem = (type: string, item: Record<string, unknown>) => {
     if (type === 'assets') {
       if (!item.id && !item.vehicle_id) return 'vehicle_id'
-      if (!item.plate) return 'plate'
-      if (!item.status) return 'status'
-      if (!item.last_update) return 'last_update'
     } else if (type === 'drivers') {
       if (!item.id && !item.driver_id) return 'driver_id'
       if (!item.name) return 'name'
@@ -107,11 +104,11 @@ export default function SyncDashboard() {
     return null
   }
 
-  const upsertItem = async (type: string, item: any) => {
+  const upsertItem = async (type: string, item: Record<string, unknown>) => {
     let collectionName = ''
     let uniqueField = ''
     let uniqueValue = ''
-    let payload: any = {}
+    let payload: Record<string, unknown> = {}
 
     if (type === 'assets') {
       collectionName = 'assets'
@@ -119,9 +116,9 @@ export default function SyncDashboard() {
       uniqueValue = String(item.id || item.vehicle_id)
       payload = {
         vehicle_id: uniqueValue,
-        plate: item.plate,
-        status: item.status,
-        last_update: item.last_update,
+        plate: item.plate ?? '',
+        status: item.status ?? '',
+        last_update: item.last_update ?? null,
       }
     } else if (type === 'drivers') {
       collectionName = 'drivers_datalbus'
@@ -185,8 +182,9 @@ export default function SyncDashboard() {
         .collection(collectionName)
         .getFirstListItem(`${uniqueField}="${uniqueValue}"`)
       await pb.collection(collectionName).update(existing.id, payload)
-    } catch (e: any) {
-      if (e.status === 404) {
+    } catch (e: unknown) {
+      const err = e as { status?: number }
+      if (err.status === 404) {
         await pb.collection(collectionName).create(payload)
       } else {
         throw e
@@ -205,25 +203,28 @@ export default function SyncDashboard() {
       addLog(`[BUSCANDO] Obtendo dados da API Datalbus (${type})...`, 'info')
       const apiAction = type === 'events' ? 'tripEvents' : type
       const res = await fetchDatalbusAction(apiAction, {})
-      const data = res.data || []
+      const data = (res.data || []) as Record<string, unknown>[]
       addLog(`[RESPOSTA] ${data.length} registros recebidos.`, 'success')
 
-      addLog(`[VALIDANDO] Validando campos obrigatórios...`, 'info')
-      const validData = []
+      addLog(
+        type === 'assets'
+          ? '[VALIDANDO] Verificando vehicle_id (obrigatório)...'
+          : '[VALIDANDO] Validando campos obrigatórios...',
+        'info',
+      )
+      const validData: Record<string, unknown>[] = []
       for (const item of data) {
         const errorField = validateItem(type, item)
         if (errorField) {
-          addLog(
-            `[ERRO] Campo obrigatório ausente: ${errorField} no registro ${
-              item.id ||
+          const recId = String(
+            item.id ||
               item.vehicle_id ||
               item.driver_id ||
               item.trip_id ||
               item.event_id ||
-              'desconhecido'
-            }`,
-            'error',
+              'desconhecido',
           )
+          addLog(`[ERRO] Campo obrigatório ausente: ${errorField} no registro ${recId}`, 'error')
           hasError = true
         } else {
           validData.push(item)
@@ -235,8 +236,9 @@ export default function SyncDashboard() {
         try {
           await upsertItem(type, item)
           successCount++
-        } catch (dbError: any) {
-          addLog(`[ERRO] Falha no banco: ${dbError.message}`, 'error')
+        } catch (dbError: unknown) {
+          const err = dbError as Error
+          addLog(`[ERRO] Falha no banco: ${err.message || 'Erro desconhecido'}`, 'error')
           hasError = true
         }
       }
@@ -259,9 +261,14 @@ export default function SyncDashboard() {
         records_count: successCount,
         duration_ms: Date.now() - startTime,
       })
-    } catch (error: any) {
-      const msg = error?.response?.error || error.message || 'Erro desconhecido'
-      const status = error?.status || 'API'
+    } catch (error: unknown) {
+      const err = error as {
+        response?: { error?: string }
+        message?: string
+        status?: number | string
+      }
+      const msg = err?.response?.error || err?.message || 'Erro desconhecido'
+      const status = err?.status || 'API'
       addLog(`[ERRO] Status ${status}, ${msg}`, 'error')
       await createSyncLog({
         type: type,

@@ -10,7 +10,7 @@ export interface SyncLog extends RecordModel {
 }
 
 export const getSyncLogs = async (filterType = 'all_records', limit = 100) => {
-  const options: Record<string, any> = {
+  const options: Record<string, unknown> = {
     sort: '-created',
   }
 
@@ -24,7 +24,7 @@ export const getSyncLogs = async (filterType = 'all_records', limit = 100) => {
     .then((res) => res.items)
 }
 
-export const createSyncLog = async (data: Record<string, any>) => {
+export const createSyncLog = async (data: Record<string, unknown>) => {
   const logData = { ...data }
   if (logData.error_message) {
     const errorStr =
@@ -55,7 +55,7 @@ export const triggerSyncDatalbus = async (
   date?: string,
 ) => {
   try {
-    const bodyObj: Record<string, any> = { action, token, tenancy_id }
+    const bodyObj: Record<string, unknown> = { action, token, tenancy_id }
     if (date) bodyObj.date = date
     const body = JSON.stringify(bodyObj)
 
@@ -73,12 +73,12 @@ export const triggerSyncDatalbus = async (
 
     clearTimeout(timeoutId)
     return result
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('triggerSyncDatalbus error:', error)
     if (error && typeof error === 'object' && 'response' in error) {
-      const resp = error.response
+      const resp = (error as { response?: { error?: string } }).response
       if (resp && resp.error) {
-        error.message = resp.error
+        ;(error as { message?: string }).message = resp.error
       }
     }
     throw error

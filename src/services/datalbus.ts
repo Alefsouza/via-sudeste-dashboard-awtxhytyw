@@ -15,7 +15,10 @@ export const authenticateDatalbus = async () => {
   throw new Error('Invalid authentication response')
 }
 
-export const fetchDatalbusAction = async (action: string, filters: any = {}) => {
+export const fetchDatalbusAction = async (
+  action: string,
+  filters: Record<string, unknown> = {},
+) => {
   if (!tokenCache) {
     await authenticateDatalbus()
   }
@@ -77,7 +80,8 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
       tokenCache!.token,
       tokenCache!.tenancy_id,
     )
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const err = error as { status?: number; response?: { error?: string } }
     if (err?.status === 401 || err?.status === 403) {
       await authenticateDatalbus()
       try {
@@ -86,7 +90,8 @@ export const fetchDatalbusAction = async (action: string, filters: any = {}) => 
           tokenCache!.token,
           tokenCache!.tenancy_id,
         )
-      } catch (retryErr: any) {
+      } catch (retryError: unknown) {
+        const retryErr = retryError as { status?: number; response?: { error?: string } }
         if (retryErr?.status === 400) {
           throw new Error(
             retryErr?.response?.error ||
@@ -124,7 +129,8 @@ export const checkDatalbusHealth = async () => {
       headers: { 'Content-Type': 'application/json' },
     })
     return res
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const err = error as { status?: number }
     if (err?.status === 401 || err?.status === 403) {
       await authenticateDatalbus()
       payload = {
