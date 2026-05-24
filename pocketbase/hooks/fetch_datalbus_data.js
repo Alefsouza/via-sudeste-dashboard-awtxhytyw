@@ -47,33 +47,25 @@ routerAdd(
 
       try {
         if (body.action === 'assets' || body.action === 'vehicles') {
-          const col = $app.findCollectionByNameOrId('vehicles')
+          const col = $app.findCollectionByNameOrId('assets')
           $app.runInTransaction((txApp) => {
             for (const item of body.data) {
               try {
-                const identifier = item.plate || item.id || item.vehicle_id
+                const identifier = item.asset_id || item.id || item.vehicle_id
                 if (!identifier) continue
-
-                const plate = item.plate ? String(item.plate).trim() : `UNK-${identifier}`
 
                 let record
                 try {
-                  record = txApp.findFirstRecordByData('vehicles', 'plate', plate)
+                  record = txApp.findFirstRecordByData('assets', 'asset_id', String(identifier))
                 } catch (_) {
                   record = new Record(col)
-                  record.set('plate', plate)
+                  record.set('asset_id', Number(identifier))
                 }
 
-                if (item.status) {
-                  const s = String(item.status).toLowerCase()
-                  if (s.includes('mov') || s.includes('run')) record.set('status', 'moving')
-                  else if (s.includes('main') || s.includes('manut'))
-                    record.set('status', 'maintenance')
-                  else record.set('status', 'idle')
-                }
-
-                if (item.model) record.set('model', item.model)
-                if (item.garage) record.set('garage', item.garage)
+                if (item.asset_description) record.set('asset_description', item.asset_description)
+                if (item.license_plate || item.plate)
+                  record.set('license_plate', item.license_plate || item.plate)
+                if (item.active !== undefined) record.set('active', Boolean(item.active))
 
                 txApp.save(record)
                 processed++
@@ -87,19 +79,20 @@ routerAdd(
           $app.runInTransaction((txApp) => {
             for (const item of body.data) {
               try {
-                const license = item.license_number || item.cpf || item.id?.toString()
-                if (!license) continue
+                const identifier = item.driver_id || item.id
+                if (!identifier) continue
 
                 let record
                 try {
-                  record = txApp.findFirstRecordByData('drivers', 'license_number', license)
+                  record = txApp.findFirstRecordByData('drivers', 'driver_id', String(identifier))
                 } catch (_) {
                   record = new Record(col)
-                  record.set('license_number', license)
+                  record.set('driver_id', Number(identifier))
                 }
 
-                if (item.name) record.set('name', item.name)
-                if (item.score !== undefined) record.set('score', Number(item.score))
+                if (item.driver_name || item.name)
+                  record.set('driver_name', item.driver_name || item.name)
+                if (item.group_desc) record.set('group_desc', item.group_desc)
 
                 txApp.save(record)
                 processed++

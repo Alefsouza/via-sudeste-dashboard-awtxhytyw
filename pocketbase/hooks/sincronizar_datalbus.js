@@ -8,9 +8,12 @@ routerAdd(
     const tenancyId = body.tenancy_id
     const date = body.date
 
-    if (!action || !['assets', 'drivers', 'trips', 'tripEvents', 'all'].includes(action)) {
+    if (
+      !action ||
+      !['assets', 'drivers', 'trips', 'tripEvents', 'eventTypes', 'all'].includes(action)
+    ) {
       return e.badRequestError(
-        'Ação inválida ou ausente. Valores permitidos: assets, drivers, trips, tripEvents, all.',
+        'Ação inválida ou ausente. Valores permitidos: assets, drivers, trips, tripEvents, eventTypes, all.',
       )
     }
     if (!token) {
@@ -140,7 +143,7 @@ routerAdd(
 
         $app.runInTransaction((txApp) => {
           for (const item of chunk) {
-            const uniqueValue = item[uniqueField]
+            const uniqueValue = item[uniqueField] || item.id
             if (uniqueValue === undefined || uniqueValue === null || uniqueValue === '') continue
 
             let record
@@ -148,19 +151,15 @@ routerAdd(
               record = txApp.findFirstRecordByData(collectionName, uniqueField, String(uniqueValue))
             } catch (_) {
               record = new Record(collection)
-              record.set(uniqueField, String(uniqueValue))
+              record.set(uniqueField, Number(uniqueValue) || String(uniqueValue))
             }
 
             const mapped = mapper(item, txApp)
             for (const [k, v] of Object.entries(mapped)) {
-              if (v !== undefined) {
-                if (v === null) {
-                  record.set(k, '')
-                } else if (k === 'distance_km') {
-                  record.set(k, Number(v) || 0)
-                } else {
-                  record.set(k, v)
-                }
+              if (v !== undefined && v !== null) {
+                record.set(k, v)
+              } else if (v === null) {
+                record.set(k, '')
               }
             }
 
@@ -193,7 +192,14 @@ routerAdd(
     try {
       if (action === 'assets' || action === 'all') {
         const data = fetchWithRetry(baseUrl + '/assets')
-        totalSynced += syncData('assets', 'vehicle_id', data, (item) => ({
+        totalSynced += syncData('assets', 'asset_id', data, (item) => ({
+          asset_id: Number(item.asset_id || item.id),
+          asset_description: item.asset_description || item.description || '',
+          manufacturer_descr: item.manufacturer_descr || item.manufacturer || '',
+          license_plate: item.license_plate || item.plate || '',
+          active: item.active !== undefined ? Boolean(item.active) : true,
+          created_at: item.created_at || null,
+          updated_at: item.updated_at || null,
           plate: item.plate || item.placa || '',
           status: item.status || '',
         }))
@@ -201,10 +207,12 @@ routerAdd(
 
       if (action === 'drivers' || action === 'all') {
         const data = fetchWithRetry(baseUrl + '/drivers')
-        totalSynced += syncData('drivers_datalbus', 'driver_id', data, (item) => ({
-          name: item.name || item.nome || '',
-          license_category: item.license_category || item.categoria_cnh || '',
-          status: item.status || '',
+        totalSynced += syncData('drivers', 'driver_id', data, (item) => ({
+          driver_id: Number(item.driver_id || item.id),
+          driver_name: item.driver_name || item.name || '',
+          group_desc: item.group_desc || '',
+          worker_id: Number(item.worker_id) || null,
+          card_id: item.card_id || '',
         }))
       }
 
@@ -214,19 +222,26 @@ routerAdd(
         try {
           const data = fetchWithRetry(baseUrl + '/trips?date=' + encodeURIComponent(syncDate))
           totalSynced += syncData('trips', 'trip_id', data, (item, txApp) => {
-            let vehicleRel = null
-            if (item.vehicle_id) {
-              try {
-                const vRecord = txApp.findFirstRecordByData(
-                  'assets',
-                  'vehicle_id',
-                  String(item.vehicle_id),
-                )
-                vehicleRel = vRecord.id
-              } catch (_) {}
-            }
             return {
-              vehicle_id: vehicleRel,
+              trip_id: Number(item.trip_id || item.id),
+              drive_id: Number(item.drive_id) || null,
+              asset_id: Number(item.asset_id) || null,
+              engine_hours: Number(item.engine_hours) || null,
+              date: item.date || null,
+              end_drive: item.end_drive || null,
+              mileage: Number(item.mileage) || null,
+              drive_duration: item.drive_duration || '',
+              total_mileage: Number(item.total_mileage) || null,
+              fuel_used: Number(item.fuel_used) || null,
+              start_latitude: Number(item.start_latitude) || null,
+              start_longitude: Number(item.start_longitude) || null,
+              end_latitude: Number(item.end_latitude) || null,
+              end_longitude: Number(item.end_longitude) || null,
+              log_gps_processed:
+                item.log_gps_processed !== undefined ? Boolean(item.log_gps_processed) : null,
+              created_at: item.created_at || null,
+              updated_at: item.updated_at || null,
+              line_name: item.line_name || '',
               start_time: item.start_time || item.inicio || '',
               end_time: item.end_time || item.fim || '',
               distance_km:
@@ -251,37 +266,43 @@ routerAdd(
         try {
           const data = fetchWithRetry(baseUrl + '/trip-events?date=' + encodeURIComponent(syncDate))
           totalSynced += syncData('trip_events', 'event_id', data, (item, txApp) => {
-            let tripRel = null
-            if (item.trip_id) {
-              try {
-                const tRecord = txApp.findFirstRecordByData(
-                  'trips',
-                  'trip_id',
-                  String(item.trip_id),
-                )
-                tripRel = tRecord.id
-              } catch (_) {}
-            }
-
-            let severity = 'baixa'
-            const inSev = String(item.severity || '').toLowerCase()
-            if (inSev === 'alta' || inSev === 'high') severity = 'alta'
-            else if (inSev === 'média' || inSev === 'media' || inSev === 'medium')
-              severity = 'média'
-
             return {
-              trip_id: tripRel,
-              vehicle_id: String(item.vehicle_id || ''),
+              event_id: Number(item.event_id || item.id),
+              trip_id: Number(item.trip_id) || null,
+              asset_id: Number(item.asset_id) || null,
+              driver_name: item.driver_name || '',
+              group_desc: item.group_desc || '',
+              worker_id: Number(item.worker_id) || null,
               event_type: item.event_type || item.tipo_evento || '',
-              severity: severity,
-              timestamp: item.timestamp || item.data_hora || '',
+              severity: item.severity || 'baixa',
+              timestamp: item.timestamp || item.data_hora || null,
               description: item.description || item.descricao || '',
+              mileage: Number(item.mileage) || null,
+              fuel_used: Number(item.fuel_used) || null,
+              idle_duration: Number(item.idle_duration) || null,
             }
           })
         } catch (err) {
           if (err.statusCode === 404) {
             $app.logger().info('Nenhum evento encontrado para a data', 'date', syncDate)
             warnings.push('Eventos não encontrados para a data especificada (404).')
+          } else {
+            throw err
+          }
+        }
+      }
+
+      if (action === 'eventTypes' || action === 'all') {
+        try {
+          const data = fetchWithRetry(baseUrl + '/events-schema?per_page=100')
+          totalSynced += syncData('event_types', 'event_type_id', data, (item) => ({
+            event_type_id: Number(item.event_type_id || item.id),
+            name: item.name || '',
+            type: item.type || '',
+          }))
+        } catch (err) {
+          if (err.statusCode === 404) {
+            warnings.push('Esquema de eventos não encontrado (404).')
           } else {
             throw err
           }

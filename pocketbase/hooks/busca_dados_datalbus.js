@@ -235,48 +235,7 @@ routerAdd(
       }
     }
 
-    let normalizedData = []
-    for (let i = 0; i < rawData.length; i++) {
-      const item = rawData[i]
-      let obj = {}
-
-      if (action === 'assets') {
-        obj = {
-          id: item.id,
-          vehicle_id: item.vehicle_id,
-          plate: item.plate,
-          status: item.status,
-          last_update: item.last_update,
-        }
-      } else if (action === 'drivers') {
-        obj = {
-          id: item.id,
-          name: item.name,
-          license_category: item.license_category,
-          status: item.status,
-        }
-      } else if (action === 'trips') {
-        obj = {
-          id: item.id,
-          vehicle_id: item.vehicle_id,
-          start_time: item.start_time,
-          end_time: item.end_time,
-          distance_km: item.distance_km,
-        }
-      } else if (action === 'tripEvents') {
-        obj = {
-          id: item.id,
-          vehicle_id: item.vehicle_id,
-          event_type: item.event_type || item.event_type_description,
-          severity: item.severity || 'low',
-          timestamp: item.timestamp || item.event_time,
-          description: item.description || item.event_type_description,
-          latitude: item.latitude,
-          longitude: item.longitude,
-        }
-      }
-      normalizedData.push(obj)
-    }
+    let normalizedData = rawData
 
     if (filters && Object.keys(filters).length > 0) {
       normalizedData = normalizedData.filter((item) => {

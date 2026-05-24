@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-24T02:11:55.868Z",
+  "generatedAt": "2026-05-24T02:58:44.117Z",
   "collections": [
     {
       "name": "users",
@@ -278,13 +278,13 @@
         {
           "name": "name",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
           "name": "license_number",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
@@ -306,9 +306,39 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "driver_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "driver_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "group_desc",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "worker_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "card_id",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": []
+      "indexes": ["CREATE UNIQUE INDEX `idx_drivers_driver_id` ON `drivers` (driver_id)"]
     },
     {
       "name": "integration_cache",
@@ -430,7 +460,7 @@
         {
           "name": "vehicle_id",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
@@ -465,9 +495,54 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "asset_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "asset_description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "manufacturer_descr",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "license_plate",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "updated_at",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_assets_vehicle_id ON assets (vehicle_id)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_assets_vehicle_id ON assets (vehicle_id)",
+        "CREATE UNIQUE INDEX `idx_assets_asset_id` ON `assets` (asset_id)"
+      ]
     },
     {
       "name": "drivers_datalbus",
@@ -535,9 +610,9 @@
       },
       "fields": [
         {
-          "name": "trip_id",
+          "name": "trip_id_old",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
@@ -578,9 +653,120 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "trip_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "drive_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "asset_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "engine_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_drive",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "mileage",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "drive_duration",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_mileage",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_used",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "start_latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "start_longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "log_gps_processed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "updated_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "line_name",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_trips_trip_id ON trips (trip_id)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_trips_trip_id` ON `trips` (trip_id)",
+        "CREATE INDEX `idx_trips_asset_id` ON `trips` (asset_id)"
+      ]
     },
     {
       "name": "trip_events",
@@ -594,13 +780,13 @@
       },
       "fields": [
         {
-          "name": "event_id",
+          "name": "event_id_old",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
-          "name": "trip_id",
+          "name": "trip_id_old",
           "type": "relation",
           "required": false,
           "system": false,
@@ -650,11 +836,115 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "event_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "trip_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "asset_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "driver_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "group_desc",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "worker_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "mileage",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_used",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "idle_duration",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
-        "CREATE UNIQUE INDEX idx_trip_events_event_id ON trip_events (event_id)",
-        "CREATE INDEX idx_trip_events_vehicle_id ON trip_events (vehicle_id)"
+        "CREATE INDEX idx_trip_events_vehicle_id ON trip_events (vehicle_id)",
+        "CREATE UNIQUE INDEX `idx_trip_events_event_id` ON `trip_events` (event_id)",
+        "CREATE INDEX `idx_trip_events_asset_id` ON `trip_events` (asset_id)",
+        "CREATE INDEX `idx_trip_events_trip_id` ON `trip_events` (trip_id)"
+      ]
+    },
+    {
+      "name": "event_types",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "event_type_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_event_types_event_type_id ON event_types (event_type_id)"
       ]
     }
   ]
