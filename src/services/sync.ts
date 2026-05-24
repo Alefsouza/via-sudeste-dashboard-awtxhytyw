@@ -54,8 +54,14 @@ export const triggerSyncDatalbus = async (action: string, token: string, tenancy
 
     clearTimeout(timeoutId)
     return result
-  } catch (error) {
+  } catch (error: any) {
     console.error('triggerSyncDatalbus error:', error)
+    if (error && typeof error === 'object' && 'response' in error) {
+      const resp = error.response
+      if (resp && resp.error) {
+        error.message = resp.error
+      }
+    }
     throw error
   }
 }

@@ -223,14 +223,14 @@ export default function SyncDashboard() {
       const duration_ms = Date.now() - start
 
       const isNetworkError =
-        !e.response && (e.message?.includes('Failed to fetch') || e.status === 0 || e.isAbort)
+        !e?.response && (e?.message?.includes('Failed to fetch') || e?.status === 0 || e?.isAbort)
 
       const errorMessage = isNetworkError
         ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.'
-        : e.response?.data?.error ||
-          e.response?.error ||
-          e.response?.message ||
-          e.message ||
+        : e?.response?.data?.error ||
+          e?.response?.error ||
+          e?.response?.message ||
+          e?.message ||
           'Erro desconhecido'
 
       try {

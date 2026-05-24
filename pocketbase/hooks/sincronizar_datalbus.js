@@ -86,23 +86,45 @@ routerAdd(
         $app.runInTransaction((txApp) => {
           for (const item of chunk) {
             const uniqueValue = item[uniqueField]
-            if (uniqueValue === undefined || uniqueValue === null) continue
+            if (uniqueValue === undefined || uniqueValue === null || uniqueValue === '') continue
 
             let record
             try {
-              record = txApp.findFirstRecordByData(collectionName, uniqueField, uniqueValue)
+              record = txApp.findFirstRecordByData(collectionName, uniqueField, String(uniqueValue))
             } catch (_) {
               record = new Record(collection)
-              record.set(uniqueField, uniqueValue)
+              record.set(uniqueField, String(uniqueValue))
             }
 
             const mapped = mapper(item, txApp)
             for (const [k, v] of Object.entries(mapped)) {
-              if (v !== undefined) record.set(k, v === null ? '' : v)
+              if (v !== undefined) {
+                if (v === null) {
+                  record.set(k, '')
+                } else if (k === 'distance_km') {
+                  record.set(k, Number(v) || 0)
+                } else {
+                  record.set(k, v)
+                }
+              }
             }
 
-            txApp.save(record)
-            count++
+            try {
+              txApp.save(record)
+              count++
+            } catch (errSave) {
+              $app
+                .logger()
+                .error(
+                  'Falha ao salvar registro',
+                  'collection',
+                  collectionName,
+                  'error',
+                  String(errSave),
+                  'item_id',
+                  String(uniqueValue),
+                )
+            }
           }
         })
       }
@@ -117,17 +139,17 @@ routerAdd(
       if (action === 'assets' || action === 'all') {
         const data = fetchWithRetry(baseUrl + '/assets')
         totalSynced += syncData('assets', 'vehicle_id', data, (item) => ({
-          plate: item.plate || item.placa,
-          status: item.status,
+          plate: item.plate || item.placa || '',
+          status: item.status || '',
         }))
       }
 
       if (action === 'drivers' || action === 'all') {
         const data = fetchWithRetry(baseUrl + '/drivers')
         totalSynced += syncData('drivers_datalbus', 'driver_id', data, (item) => ({
-          name: item.name || item.nome,
-          license_category: item.license_category || item.categoria_cnh,
-          status: item.status,
+          name: item.name || item.nome || '',
+          license_category: item.license_category || item.categoria_cnh || '',
+          status: item.status || '',
         }))
       }
 
@@ -137,15 +159,24 @@ routerAdd(
           let vehicleRel = null
           if (item.vehicle_id) {
             try {
-              const vRecord = txApp.findFirstRecordByData('assets', 'vehicle_id', item.vehicle_id)
+              const vRecord = txApp.findFirstRecordByData(
+                'assets',
+                'vehicle_id',
+                String(item.vehicle_id),
+              )
               vehicleRel = vRecord.id
             } catch (_) {}
           }
           return {
             vehicle_id: vehicleRel,
-            start_time: item.start_time || item.inicio,
-            end_time: item.end_time || item.fim,
-            distance_km: item.distance_km || item.distancia_km,
+            start_time: item.start_time || item.inicio || '',
+            end_time: item.end_time || item.fim || '',
+            distance_km:
+              item.distance_km != null
+                ? item.distance_km
+                : item.distancia_km != null
+                  ? item.distancia_km
+                  : 0,
           }
         })
       }
@@ -156,23 +187,23 @@ routerAdd(
           let tripRel = null
           if (item.trip_id) {
             try {
-              const tRecord = txApp.findFirstRecordByData('trips', 'trip_id', item.trip_id)
+              const tRecord = txApp.findFirstRecordByData('trips', 'trip_id', String(item.trip_id))
               tripRel = tRecord.id
             } catch (_) {}
           }
 
           let severity = 'baixa'
-          const inSev = (item.severity || '').toLowerCase()
+          const inSev = String(item.severity || '').toLowerCase()
           if (inSev === 'alta' || inSev === 'high') severity = 'alta'
           else if (inSev === 'média' || inSev === 'media' || inSev === 'medium') severity = 'média'
 
           return {
             trip_id: tripRel,
-            vehicle_id: item.vehicle_id,
-            event_type: item.event_type || item.tipo_evento,
+            vehicle_id: String(item.vehicle_id || ''),
+            event_type: item.event_type || item.tipo_evento || '',
             severity: severity,
-            timestamp: item.timestamp || item.data_hora,
-            description: item.description || item.descricao,
+            timestamp: item.timestamp || item.data_hora || '',
+            description: item.description || item.descricao || '',
           }
         })
       }
