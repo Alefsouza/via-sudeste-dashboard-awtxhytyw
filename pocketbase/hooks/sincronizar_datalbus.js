@@ -19,8 +19,10 @@ routerAdd(
     if (!tenancyId) {
       return e.badRequestError('Tenancy ID ausente.')
     }
-    if (['trips', 'tripEvents', 'all'].includes(action) && !date) {
-      return e.badRequestError('O campo data é obrigatório para esta sincronização.')
+
+    let syncDate = date
+    if (!syncDate) {
+      syncDate = new Date().toISOString().split('T')[0]
     }
 
     const baseUrl = $secrets.get('DATALBUS_BASE_URL') || 'https://datalbus.com.br:8000/api/v2'
@@ -58,21 +60,64 @@ routerAdd(
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
             let errorBody = ''
+            let isJson = false
             try {
               if (res.json) {
-                errorBody = JSON.stringify(res.json)
+                errorBody =
+                  typeof res.json === 'object' ? JSON.stringify(res.json) : String(res.json)
+                isJson = true
               } else if (res.body && res.body.length > 0) {
                 errorBody = new TextDecoder().decode(res.body)
+                if (
+                  errorBody.toLowerCase().includes('<html') ||
+                  errorBody.toLowerCase().includes('<!doctype')
+                ) {
+                  errorBody = errorBody.replace(/<[^>]*>?/gm, ' ')
+                  errorBody = errorBody.replace(/\s+/g, ' ').trim()
+                }
               }
             } catch (_) {
               errorBody = 'Não foi possível decodificar a resposta do erro.'
             }
-            throw new Error('Erro na API Datalbus (HTTP ' + res.statusCode + '): ' + errorBody)
+
+            let errMsg = 'Erro na API Datalbus (HTTP ' + res.statusCode + ')'
+            if (res.statusCode === 404) {
+              errMsg = isJson
+                ? 'Resource not found at provider: ' + errorBody
+                : 'Resource not found at provider'
+            } else if (errorBody) {
+              errMsg += ': ' + errorBody
+            }
+
+            const err = new Error(errMsg)
+            err.statusCode = res.statusCode
+            throw err
+          }
+
+          if (!res.json) {
+            let errorBody = ''
+            if (res.body && res.body.length > 0) {
+              errorBody = new TextDecoder().decode(res.body)
+              if (
+                errorBody.toLowerCase().includes('<html') ||
+                errorBody.toLowerCase().includes('<!doctype')
+              ) {
+                errorBody = errorBody.replace(/<[^>]*>?/gm, ' ')
+                errorBody = errorBody.replace(/\s+/g, ' ').trim()
+              }
+            }
+            throw new Error(
+              'Resposta inválida do Datalbus (não é JSON). Conteúdo: ' +
+                errorBody.substring(0, 500),
+            )
           }
 
           return res.json
         } catch (err) {
-          if (attempts < delays.length && err.message && err.message.includes('429')) {
+          if (
+            attempts < delays.length &&
+            (err.statusCode === 429 || (err.message && err.message.includes('429')))
+          ) {
             sleep(delays[attempts])
             attempts++
             continue
@@ -163,59 +208,84 @@ routerAdd(
         }))
       }
 
+      let warnings = []
+
       if (action === 'trips' || action === 'all') {
-        const data = fetchWithRetry(baseUrl + '/trips?date=' + encodeURIComponent(date))
-        totalSynced += syncData('trips', 'trip_id', data, (item, txApp) => {
-          let vehicleRel = null
-          if (item.vehicle_id) {
-            try {
-              const vRecord = txApp.findFirstRecordByData(
-                'assets',
-                'vehicle_id',
-                String(item.vehicle_id),
-              )
-              vehicleRel = vRecord.id
-            } catch (_) {}
+        try {
+          const data = fetchWithRetry(baseUrl + '/trips?date=' + encodeURIComponent(syncDate))
+          totalSynced += syncData('trips', 'trip_id', data, (item, txApp) => {
+            let vehicleRel = null
+            if (item.vehicle_id) {
+              try {
+                const vRecord = txApp.findFirstRecordByData(
+                  'assets',
+                  'vehicle_id',
+                  String(item.vehicle_id),
+                )
+                vehicleRel = vRecord.id
+              } catch (_) {}
+            }
+            return {
+              vehicle_id: vehicleRel,
+              start_time: item.start_time || item.inicio || '',
+              end_time: item.end_time || item.fim || '',
+              distance_km:
+                item.distance_km != null
+                  ? item.distance_km
+                  : item.distancia_km != null
+                    ? item.distancia_km
+                    : 0,
+            }
+          })
+        } catch (err) {
+          if (err.statusCode === 404) {
+            $app.logger().info('Nenhuma viagem encontrada para a data', 'date', syncDate)
+            warnings.push('Viagens não encontradas para a data especificada (404).')
+          } else {
+            throw err
           }
-          return {
-            vehicle_id: vehicleRel,
-            start_time: item.start_time || item.inicio || '',
-            end_time: item.end_time || item.fim || '',
-            distance_km:
-              item.distance_km != null
-                ? item.distance_km
-                : item.distancia_km != null
-                  ? item.distancia_km
-                  : 0,
-          }
-        })
+        }
       }
 
       if (action === 'tripEvents' || action === 'all') {
-        const data = fetchWithRetry(baseUrl + '/trip-events?date=' + encodeURIComponent(date))
-        totalSynced += syncData('trip_events', 'event_id', data, (item, txApp) => {
-          let tripRel = null
-          if (item.trip_id) {
-            try {
-              const tRecord = txApp.findFirstRecordByData('trips', 'trip_id', String(item.trip_id))
-              tripRel = tRecord.id
-            } catch (_) {}
-          }
+        try {
+          const data = fetchWithRetry(baseUrl + '/trip-events?date=' + encodeURIComponent(syncDate))
+          totalSynced += syncData('trip_events', 'event_id', data, (item, txApp) => {
+            let tripRel = null
+            if (item.trip_id) {
+              try {
+                const tRecord = txApp.findFirstRecordByData(
+                  'trips',
+                  'trip_id',
+                  String(item.trip_id),
+                )
+                tripRel = tRecord.id
+              } catch (_) {}
+            }
 
-          let severity = 'baixa'
-          const inSev = String(item.severity || '').toLowerCase()
-          if (inSev === 'alta' || inSev === 'high') severity = 'alta'
-          else if (inSev === 'média' || inSev === 'media' || inSev === 'medium') severity = 'média'
+            let severity = 'baixa'
+            const inSev = String(item.severity || '').toLowerCase()
+            if (inSev === 'alta' || inSev === 'high') severity = 'alta'
+            else if (inSev === 'média' || inSev === 'media' || inSev === 'medium')
+              severity = 'média'
 
-          return {
-            trip_id: tripRel,
-            vehicle_id: String(item.vehicle_id || ''),
-            event_type: item.event_type || item.tipo_evento || '',
-            severity: severity,
-            timestamp: item.timestamp || item.data_hora || '',
-            description: item.description || item.descricao || '',
+            return {
+              trip_id: tripRel,
+              vehicle_id: String(item.vehicle_id || ''),
+              event_type: item.event_type || item.tipo_evento || '',
+              severity: severity,
+              timestamp: item.timestamp || item.data_hora || '',
+              description: item.description || item.descricao || '',
+            }
+          })
+        } catch (err) {
+          if (err.statusCode === 404) {
+            $app.logger().info('Nenhum evento encontrado para a data', 'date', syncDate)
+            warnings.push('Eventos não encontrados para a data especificada (404).')
+          } else {
+            throw err
           }
-        })
+        }
       }
 
       const durationMs = Date.now() - startMs
@@ -232,13 +302,19 @@ routerAdd(
         $app.logger().error('Failed to save sync log', 'error', String(eLog))
       }
 
-      return e.json(200, {
+      const responseData = {
         success: true,
         action: action,
         records_synced: totalSynced,
         duration_ms: durationMs,
         timestamp: new Date().toISOString(),
-      })
+      }
+
+      if (warnings.length > 0) {
+        responseData.message = warnings.join(' ')
+      }
+
+      return e.json(200, responseData)
     } catch (err) {
       const durationMs = Date.now() - startMs
       let errorMsg = err.message || String(err)
@@ -260,10 +336,12 @@ routerAdd(
         $app.logger().error('Failed to save sync log', 'error', String(eLog))
       }
 
-      return e.json(500, {
+      const statusCode = err.statusCode === 404 ? 404 : 500
+
+      return e.json(statusCode, {
         success: false,
         error: 'Falha na sincronização: ' + errorMsg,
-        statusCode: 500,
+        statusCode: statusCode,
       })
     }
   },
