@@ -1,4 +1,4 @@
-routerAdd('OPTIONS', '/backend/v1/fetchDatalbusData', (e) => {
+routerAdd('OPTIONS', '/backend/v1/fetch_datalbus_data', (e) => {
   e.response.header().set('Access-Control-Allow-Origin', '*')
   e.response.header().set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   e.response.header().set('Access-Control-Allow-Headers', 'authorization, apikey, content-type')
@@ -7,7 +7,7 @@ routerAdd('OPTIONS', '/backend/v1/fetchDatalbusData', (e) => {
 
 routerAdd(
   'POST',
-  '/backend/v1/fetchDatalbusData',
+  '/backend/v1/fetch_datalbus_data',
   (e) => {
     const startTime = Date.now()
 
@@ -23,7 +23,7 @@ routerAdd(
         .error(
           'Datalbus integration missing secrets',
           'endpoint',
-          '/backend/v1/fetchDatalbusData',
+          '/backend/v1/fetch_datalbus_data',
           'statusCode',
           503,
         )
@@ -35,24 +35,11 @@ routerAdd(
     }
 
     const body = e.requestInfo().body || {}
-    const startDate = body.start_date
-    const endDate = body.end_date
-    if (!startDate || !endDate) {
-      $app
-        .logger()
-        .error(
-          'Missing date parameters',
-          'endpoint',
-          '/backend/v1/fetchDatalbusData',
-          'statusCode',
-          400,
-        )
-      return e.json(400, {
-        success: false,
-        error: 'Parâmetros obrigatórios faltando (start_date, end_date)',
-        code: 'MISSING_PARAMS',
-      })
-    }
+
+    // Default to today if dates are not provided (e.g. from sync dashboard action payload)
+    const todayStr = new Date().toISOString().split('T')[0]
+    const startDate = body.start_date || todayStr
+    const endDate = body.end_date || todayStr
 
     const start = new Date(startDate)
     const end = new Date(endDate)
@@ -152,7 +139,7 @@ routerAdd(
             .error(
               'Invalid datalbus credentials',
               'endpoint',
-              '/backend/v1/fetchDatalbusData',
+              '/backend/v1/fetch_datalbus_data',
               'statusCode',
               401,
             )
@@ -169,7 +156,7 @@ routerAdd(
             .error(
               'Datalbus login failed',
               'endpoint',
-              '/backend/v1/fetchDatalbusData',
+              '/backend/v1/fetch_datalbus_data',
               'status',
               loginRes.status,
               'statusCode',
@@ -460,7 +447,7 @@ routerAdd(
         .info(
           'Datalbus fetch success',
           'endpoint',
-          '/backend/v1/fetchDatalbusData',
+          '/backend/v1/fetch_datalbus_data',
           'durationMs',
           duration,
           'startDate',
@@ -497,7 +484,7 @@ routerAdd(
           .error(
             'Datalbus token expired during fetch',
             'endpoint',
-            '/backend/v1/fetchDatalbusData',
+            '/backend/v1/fetch_datalbus_data',
             'durationMs',
             duration,
             'statusCode',
@@ -516,7 +503,7 @@ routerAdd(
           .error(
             'Datalbus API failure',
             'endpoint',
-            '/backend/v1/fetchDatalbusData',
+            '/backend/v1/fetch_datalbus_data',
             'error',
             err.message,
             'durationMs',
@@ -536,7 +523,7 @@ routerAdd(
         .error(
           'Datalbus fetch error',
           'endpoint',
-          '/backend/v1/fetchDatalbusData',
+          '/backend/v1/fetch_datalbus_data',
           'error',
           err.message,
           'stack',
