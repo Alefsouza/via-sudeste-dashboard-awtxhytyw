@@ -241,13 +241,25 @@ export default function SyncDashboard() {
       const isNetworkError =
         !e?.response && (e?.message?.includes('Failed to fetch') || e?.status === 0 || e?.isAbort)
 
-      const errorMessage = isNetworkError
+      let errorMessage = isNetworkError
         ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.'
         : e?.response?.data?.error ||
           e?.response?.error ||
           e?.response?.message ||
           e?.message ||
           'Erro desconhecido'
+
+      if (typeof errorMessage !== 'string') {
+        try {
+          errorMessage = JSON.stringify(errorMessage)
+        } catch (_) {
+          errorMessage = String(errorMessage)
+        }
+      }
+
+      if (errorMessage.length > 4900) {
+        errorMessage = errorMessage.substring(0, 4900) + '...'
+      }
 
       try {
         await createSyncLog({

@@ -59,8 +59,14 @@ routerAdd(
           if (res.statusCode < 200 || res.statusCode >= 300) {
             let errorBody = ''
             try {
-              errorBody = JSON.stringify(res.json || res.body)
-            } catch (_) {}
+              if (res.json) {
+                errorBody = JSON.stringify(res.json)
+              } else if (res.body && res.body.length > 0) {
+                errorBody = new TextDecoder().decode(res.body)
+              }
+            } catch (_) {
+              errorBody = 'Não foi possível decodificar a resposta do erro.'
+            }
             throw new Error('Erro na API Datalbus (HTTP ' + res.statusCode + '): ' + errorBody)
           }
 
@@ -235,7 +241,11 @@ routerAdd(
       })
     } catch (err) {
       const durationMs = Date.now() - startMs
-      const errorMsg = err.message || String(err)
+      let errorMsg = err.message || String(err)
+
+      if (errorMsg.length > 4900) {
+        errorMsg = errorMsg.substring(0, 4900) + '...'
+      }
 
       try {
         const logCol = $app.findCollectionByNameOrId('sync_logs')

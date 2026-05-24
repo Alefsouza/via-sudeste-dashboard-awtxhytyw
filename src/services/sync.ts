@@ -25,7 +25,20 @@ export const getSyncLogs = async (filterType = 'all_records', limit = 100) => {
 }
 
 export const createSyncLog = async (data: Record<string, any>) => {
-  return await pb.collection('sync_logs').create(data)
+  const logData = { ...data }
+  if (logData.error_message) {
+    const errorStr =
+      typeof logData.error_message === 'string'
+        ? logData.error_message
+        : JSON.stringify(logData.error_message)
+
+    if (errorStr.length > 4900) {
+      logData.error_message = errorStr.substring(0, 4900) + '...'
+    } else {
+      logData.error_message = errorStr
+    }
+  }
+  return await pb.collection('sync_logs').create(logData)
 }
 
 export const clearSyncLogs = async () => {
