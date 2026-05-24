@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-24T00:32:46.847Z",
+  "generatedAt": "2026-05-24T01:03:33.838Z",
   "collections": [
     {
       "name": "users",
@@ -415,6 +415,247 @@
         }
       ],
       "indexes": []
+    },
+    {
+      "name": "assets",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "vehicle_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "plate",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_update",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_assets_vehicle_id ON assets (vehicle_id)"]
+    },
+    {
+      "name": "drivers_datalbus",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "driver_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "license_category",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_drivers_datalbus_driver_id ON drivers_datalbus (driver_id)"
+      ]
+    },
+    {
+      "name": "trips",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "trip_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "vehicle_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "assets"
+        },
+        {
+          "name": "start_time",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_time",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "distance_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_trips_trip_id ON trips (trip_id)"]
+    },
+    {
+      "name": "trip_events",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "event_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "trip_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "trips"
+        },
+        {
+          "name": "vehicle_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "severity",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["alta", "média", "baixa"]
+        },
+        {
+          "name": "timestamp",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_trip_events_event_id ON trip_events (event_id)",
+        "CREATE INDEX idx_trip_events_vehicle_id ON trip_events (vehicle_id)"
+      ]
     }
   ]
 }
