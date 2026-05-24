@@ -46,9 +46,11 @@ routerAdd(
 
     const globalStart = Date.now()
 
-    const wait = (ms) => {
+    const sleep = (ms) => {
       const start = Date.now()
-      while (Date.now() - start < ms) {}
+      while (Date.now() - start < ms) {
+        // blocking sleep
+      }
     }
 
     const fetchDatalbus = (path, extraFilters = {}) => {
@@ -79,7 +81,7 @@ routerAdd(
           throw new Error('TIMEOUT')
         }
 
-        if (delays[attempt] > 0) wait(delays[attempt])
+        if (delays[attempt] > 0) sleep(delays[attempt])
 
         try {
           const res = $http.send({
