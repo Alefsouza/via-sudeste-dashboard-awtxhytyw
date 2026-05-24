@@ -27,7 +27,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { AlertTriangle, Info, Activity, Truck, Users, LayoutDashboard } from 'lucide-react'
+import { AlertTriangle, Info, Activity, Truck, Users, LayoutDashboard, Wrench } from 'lucide-react'
 
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -39,7 +39,7 @@ const EmptyState = () => (
       alt="Empty"
       className="w-24 h-24 mb-4 opacity-70"
     />
-    <p className="text-[14px] font-normal">Nenhum dado para este período. Tente outro filtro.</p>
+    <p className="text-[14px] font-normal">Nenhum dado encontrado</p>
   </div>
 )
 
@@ -102,6 +102,7 @@ export default function Index() {
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [selectedDtc, setSelectedDtc] = useState<any>(null)
+  const [lastSync, setLastSync] = useState<any>(null)
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -126,7 +127,7 @@ export default function Index() {
 
       const alertsFilter = dateFilter ? `resolved = false && ${dateFilter}` : `resolved = false`
 
-      const [v, a, d, t] = await Promise.all([
+      const [v, a, d, t, s] = await Promise.all([
         pb.collection('vehicles').getFullList({ sort: '-updated' }),
         pb
           .collection('alerts')
@@ -135,12 +136,14 @@ export default function Index() {
         pb
           .collection('telemetry_logs')
           .getList(1, 500, { filter: dateFilter, sort: '-created', expand: 'vehicle_id' }),
+        pb.collection('sync_logs').getList(1, 1, { sort: '-created' }),
       ])
 
       setVehicles(v)
       setAlerts(a)
       setDrivers(d)
       setTelemetry(t.items)
+      setLastSync(s.items[0] || null)
     } catch (err: any) {
       console.error(err)
       setErrorMsg('Erro ao buscar dados do servidor. Tente novamente mais tarde.')
@@ -157,6 +160,7 @@ export default function Index() {
   useRealtime('alerts', () => fetchData(debouncedFilters))
   useRealtime('drivers', () => fetchData(debouncedFilters))
   useRealtime('telemetry_logs', () => fetchData(debouncedFilters))
+  useRealtime('sync_logs', () => fetchData(debouncedFilters))
 
   const options = useMemo(() => {
     const garages = Array.from(
@@ -205,11 +209,15 @@ export default function Index() {
         )
         .join(' | ') || 'Nenhum'
 
+    const inMaintenance = filteredVehicles.filter((v: any) => v.status === 'maintenance').length
+    const moving = filteredVehicles.filter((v: any) => v.status === 'moving').length
+
     return {
       carros: filteredVehicles.length,
       motoristas: drivers.length,
       eventos: filteredAlerts.length,
-      variacao: '-',
+      manutencao: inMaintenance,
+      emTransito: moving,
       frotaStatus: fleetStatus,
       frotaColor: fleetStatusColor,
       garageSummary: garagePercents,
@@ -217,21 +225,18 @@ export default function Index() {
   }, [filteredVehicles, drivers, filteredAlerts])
 
   const telemetryData = useMemo(() => {
-    const stats: Record<string, { speedSum: number; count: number; plate: string }> = {}
+    const latest: Record<string, { speed: number; plate: string }> = {}
     filteredTelemetry.forEach((log: any) => {
       const vid = log.vehicle_id
-      if (!stats[vid]) {
-        stats[vid] = {
-          speedSum: 0,
-          count: 0,
+      if (!latest[vid]) {
+        latest[vid] = {
+          speed: log.speed || 0,
           plate: log.expand?.vehicle_id?.plate || 'Desconhecido',
         }
       }
-      stats[vid].speedSum += log.speed || 0
-      stats[vid].count += 1
     })
-    return Object.values(stats)
-      .map((s) => ({ name: s.plate, count: Math.round(s.speedSum / s.count) }))
+    return Object.values(latest)
+      .map((s) => ({ name: s.plate, count: s.speed }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
   }, [filteredTelemetry])
@@ -336,22 +341,31 @@ export default function Index() {
       subtitle: 'Frota conectada (filtrada)',
     },
     {
-      title: 'Qtd Motoristas',
-      value: kpis.motoristas,
-      icon: Users,
-      subtitle: 'Total de motoristas',
-    },
-    {
       title: 'Alertas Ativos',
       value: kpis.eventos,
       icon: AlertTriangle,
       subtitle: 'Não resolvidos no período',
     },
     {
-      title: '% Variação',
-      value: kpis.variacao,
-      icon: Info,
-      subtitle: 'Vs. período anterior',
+      title: 'Em Manutenção',
+      value: kpis.manutencao,
+      icon: Wrench,
+      subtitle: 'Veículos na oficina',
+      customColor: 'text-[#ef4444]',
+    },
+    {
+      title: 'Em Trânsito',
+      value: kpis.emTransito,
+      value: kpis.emTransito,
+      icon: Activity,
+      subtitle: 'Veículos em movimento',
+      customColor: 'text-[#10b981]',
+    },
+    {
+      title: 'Qtd Motoristas',
+      value: kpis.motoristas,
+      icon: Users,
+      subtitle: 'Total de motoristas',
     },
     {
       title: 'Status da Frota',
@@ -360,7 +374,6 @@ export default function Index() {
       subtitle: 'Saúde operacional',
       customColor: kpis.frotaColor,
     },
-    { title: '% Por Garagem', value: 'Resumo', icon: Info, subtitle: kpis.garageSummary },
   ]
 
   return (
@@ -374,6 +387,7 @@ export default function Index() {
         </h1>
         <p className="text-[12px] font-normal text-[#d1d5db] mt-1">
           Visão analítica de falhas e eventos em tempo real.
+          {lastSync && ` Última sincronização: ${new Date(lastSync.created).toLocaleString()}`}
         </p>
       </div>
 

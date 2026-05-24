@@ -14,20 +14,25 @@ import { Input } from '@/components/ui/input'
 import { getVehicles } from '@/services/vehicles'
 import useRealtime from '@/hooks/use-realtime'
 import { RecordModel } from 'pocketbase'
-import { Search, MapPin, Loader2 } from 'lucide-react'
+import { Search, MapPin, Loader2, Info } from 'lucide-react'
+import { getSyncLogs } from '@/services/sync'
 
 export default function Vehicles() {
   const [vehicles, setVehicles] = useState<RecordModel[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [lastSync, setLastSync] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const loadData = async () => {
     try {
-      const res = await getVehicles()
+      const [res, syncLogs] = await Promise.all([getVehicles(), getSyncLogs()])
       setVehicles(res)
-    } catch {
-      /* intentionally ignored */
+      if (syncLogs.length > 0) {
+        setLastSync(new Date(syncLogs[0].created).toLocaleString())
+      }
+    } catch (err) {
+      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -37,6 +42,9 @@ export default function Vehicles() {
     loadData()
   }, [])
   useRealtime('vehicles', () => {
+    loadData()
+  })
+  useRealtime('sync_logs', () => {
     loadData()
   })
 
@@ -78,7 +86,18 @@ export default function Vehicles() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Frota</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Frota</h1>
+            {lastSync && (
+              <Badge
+                variant="outline"
+                className="hidden sm:inline-flex text-xs font-normal text-muted-foreground border-muted-foreground/20"
+              >
+                <Info className="w-3 h-3 mr-1" />
+                Atualizado: {lastSync}
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">Gerenciamento e status de todos os veículos.</p>
         </div>
         <div className="relative w-full max-w-sm">
@@ -108,14 +127,14 @@ export default function Vehicles() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : filteredVehicles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    Nenhum veículo encontrado.
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    Nenhum dado encontrado
                   </TableCell>
                 </TableRow>
               ) : (

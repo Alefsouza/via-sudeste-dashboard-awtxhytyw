@@ -2,19 +2,26 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getDrivers } from '@/services/drivers'
 import { RecordModel } from 'pocketbase'
-import { Loader2, Award, FileText } from 'lucide-react'
+import { Loader2, Award, FileText, Users, Info } from 'lucide-react'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { getSyncLogs } from '@/services/sync'
 
 export default function Drivers() {
   const [drivers, setDrivers] = useState<RecordModel[]>([])
   const [loading, setLoading] = useState(true)
+  const [lastSync, setLastSync] = useState<string | null>(null)
 
   const loadData = () => {
-    getDrivers()
-      .then(setDrivers)
+    Promise.all([getDrivers(), getSyncLogs()])
+      .then(([driversData, syncData]) => {
+        setDrivers(driversData)
+        if (syncData.length > 0) {
+          setLastSync(new Date(syncData[0].created).toLocaleString())
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
@@ -27,6 +34,10 @@ export default function Drivers() {
     loadData()
   })
 
+  useRealtime('sync_logs', () => {
+    loadData()
+  })
+
   if (loading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -35,10 +46,39 @@ export default function Drivers() {
     )
   }
 
+  if (drivers.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Motoristas</h1>
+          <p className="text-muted-foreground mt-1">Classificação e performance da equipe.</p>
+        </div>
+        <div className="flex h-[40vh] items-center justify-center border-2 border-dashed rounded-lg border-muted">
+          <div className="text-center">
+            <Users className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground">Nenhum dado encontrado</h3>
+            <p className="text-sm text-muted-foreground mt-1">Aguardando sincronização de dados.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Motoristas</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">Motoristas</h1>
+          {lastSync && (
+            <Badge
+              variant="outline"
+              className="hidden sm:inline-flex text-xs font-normal text-muted-foreground border-muted-foreground/20"
+            >
+              <Info className="w-3 h-3 mr-1" />
+              Atualizado: {lastSync}
+            </Badge>
+          )}
+        </div>
         <p className="text-muted-foreground mt-1">Classificação e performance da equipe.</p>
       </div>
 
