@@ -50,7 +50,11 @@ migrate(
         record.set('score', d.score)
         record.set('driver_id', d.driver_id)
         record.set('driver_name', d.driver_name)
-        app.save(record)
+        try {
+          app.save(record)
+        } catch (err) {
+          console.log('Could not seed driver', d.driver_id, err)
+        }
       }
     }
 
@@ -101,7 +105,7 @@ migrate(
     const assetsCol = app.findCollectionByNameOrId('assets')
     for (const a of assetsData) {
       try {
-        app.findFirstRecordByData('assets', 'vehicle_id', a.vehicle_id)
+        app.findFirstRecordByData('assets', 'asset_id', a.asset_id)
       } catch (_) {
         const record = new Record(assetsCol)
         record.set('vehicle_id', a.vehicle_id)
@@ -110,7 +114,11 @@ migrate(
         record.set('active', a.active)
         record.set('asset_id', a.asset_id)
         record.set('asset_description', a.asset_description)
-        app.save(record)
+        try {
+          app.save(record)
+        } catch (err) {
+          console.log('Could not seed asset', a.asset_id, err)
+        }
       }
     }
 
@@ -221,7 +229,11 @@ migrate(
         record.set('timestamp', e.timestamp)
         record.set('description', e.description)
         record.set('driver_name', e.driver_name)
-        app.save(record)
+        try {
+          app.save(record)
+        } catch (err) {
+          console.log('Could not seed event', e.event_id, err)
+        }
       }
     }
   },
