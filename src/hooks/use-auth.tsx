@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import pb from '@/lib/pocketbase/client'
+import type { RecordModel } from 'pocketbase'
 
 interface AuthContextType {
-  user: any
+  user: RecordModel | null
   isAuthenticated: boolean
-  signUp: (email: string, password: string) => Promise<{ error: any }>
-  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string) => Promise<{ error: Error | null }>
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => void
   loading: boolean
 }
@@ -19,9 +20,11 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<any>(pb.authStore.isValid ? pb.authStore.record : null)
-  const [isAuthenticated, setIsAuthenticated] = useState(pb.authStore.isValid)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<RecordModel | null>(
+    pb.authStore.isValid ? pb.authStore.record : null,
+  )
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(pb.authStore.isValid)
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     const unsubscribe = pb.authStore.onChange((_token, record) => {
@@ -49,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await pb.collection('users').authWithPassword(email, password)
       return { error: null }
     } catch (error) {
-      return { error }
+      return { error: error instanceof Error ? error : new Error('Unknown error') }
     }
   }
 
@@ -58,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await pb.collection('users').authWithPassword(email, password)
       return { error: null }
     } catch (error) {
-      return { error }
+      return { error: error instanceof Error ? error : new Error('Unknown error') }
     }
   }
 
