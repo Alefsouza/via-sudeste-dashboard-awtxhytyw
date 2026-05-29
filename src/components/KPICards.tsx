@@ -1,16 +1,16 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MappedLocation } from '@/types';
-import { Activity, AlertTriangle, Route, SignalHigh } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MappedLocation } from '@/types'
+import { Activity, AlertTriangle, Route, SignalHigh } from 'lucide-react'
 
 interface Props {
-  locations: MappedLocation[];
-  totalTrips: number;
-  totalAlerts: number;
+  locations: MappedLocation[]
+  totalTrips: number
+  totalAlerts: number
 }
 
 export function KPICards({ locations, totalTrips, totalAlerts }: Props) {
-  const inOperationCount = locations.filter(l => l.status === 'operation').length;
-  const disconnectedCount = locations.filter(l => l.status === 'disconnected').length;
+  const inOperationCount = locations.filter((l) => l.status === 'operation').length
+  const disconnectedCount = locations.filter((l) => l.status === 'disconnected').length
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -23,10 +23,12 @@ export function KPICards({ locations, totalTrips, totalAlerts }: Props) {
           <div className="text-2xl font-bold">{inOperationCount}</div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Desconectados (>12h)</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Desconectados (&gt;12h)
+          </CardTitle>
           <SignalHigh className="w-4 h-4 text-red-500 opacity-50" />
         </CardHeader>
         <CardContent>
@@ -46,7 +48,9 @@ export function KPICards({ locations, totalTrips, totalAlerts }: Props) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Alertas Críticos Hoje</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Alertas Críticos Hoje
+          </CardTitle>
           <AlertTriangle className="w-4 h-4 text-red-500" />
         </CardHeader>
         <CardContent>
@@ -54,5 +58,5 @@ export function KPICards({ locations, totalTrips, totalAlerts }: Props) {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
