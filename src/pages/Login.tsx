@@ -1,67 +1,48 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { useNavigate } from 'react-router-dom'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Bus, Loader2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Activity } from 'lucide-react'
 
 export default function Login() {
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
-  const { toast } = useToast()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const { error } = await signIn(email, password)
+    setError('')
+    const res = await signIn(email, password)
+    if (res.error) setError('Credenciais inválidas. Verifique seu e-mail e senha.')
     setLoading(false)
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao entrar',
-        description: 'Credenciais inválidas. Tente novamente.',
-      })
-    } else {
-      navigate('/')
-    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-sm shadow-xl">
-        <CardHeader className="space-y-2 text-center">
-          <div className="flex justify-center mb-2">
-            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-md">
-              <Bus className="w-6 h-6 text-primary-foreground" />
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 bg-primary/10 p-3 rounded-full w-fit">
+            <Activity className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Bem-vindo</CardTitle>
-          <CardDescription>Entre no Painel de Operação da Via Sudeste</CardDescription>
+          <CardTitle className="text-2xl">Via Sudeste</CardTitle>
+          <CardDescription>Faça login para acessar o sistema</CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="operacao@viasudeste.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                placeholder="telemetria@viasudeste.com"
               />
             </div>
             <div className="space-y-2">
@@ -72,16 +53,15 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                placeholder="Sua senha"
               />
             </div>
-          </CardContent>
-          <CardFooter>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
-          </CardFooter>
-        </form>
+          </form>
+        </CardContent>
       </Card>
     </div>
   )

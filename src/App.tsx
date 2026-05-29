@@ -1,28 +1,21 @@
 /* Main App Component - Handles routing (using react-router-dom), query client and other providers - use this file to add all routes */
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { AuthProvider, useAuth } from './hooks/use-auth'
+import Login from './pages/Login'
 import Index from './pages/Index'
+import Maintenance from './pages/Maintenance'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
-import Login from './pages/Login'
-import VehicleDetails from './pages/VehicleDetails'
-import { AuthProvider, useAuth } from './hooks/use-auth'
-import { Loader2 } from 'lucide-react'
 
-function ProtectedRoute() {
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
+  if (loading)
+    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>
+  if (!isAuthenticated) return <Login />
+  return <>{children}</>
 }
 
 const App = () => (
@@ -32,12 +25,15 @@ const App = () => (
         <Toaster />
         <Sonner />
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/vehicles/:id" element={<VehicleDetails />} />
-            </Route>
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<Index />} />
+            <Route path="/manutencao" element={<Maintenance />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
