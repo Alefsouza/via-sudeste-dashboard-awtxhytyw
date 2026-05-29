@@ -28,6 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(pb.authStore.isValid ? record : null)
       setIsAuthenticated(pb.authStore.isValid)
     })
+
     if (pb.authStore.isValid) {
       pb.collection('users')
         .authRefresh()

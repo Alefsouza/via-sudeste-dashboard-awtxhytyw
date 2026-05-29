@@ -1,199 +1,88 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '@/hooks/use-auth'
-import { useToast } from '@/hooks/use-toast'
-import { useRealtime } from '@/hooks/use-realtime'
+import { useEffect, useState } from 'react'
 import pb from '@/lib/pocketbase/client'
-
+import { useRealtime } from '@/hooks/use-realtime'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { LogOut, RefreshCw } from 'lucide-react'
+import { Activity, MapPin, Truck } from 'lucide-react'
 
 export default function Index() {
-  const { isAuthenticated, signIn, signOut, loading: authLoading } = useAuth()
-  const { toast } = useToast()
+  const [stats, setStats] = useState({ trips: 0, events: 0, locations: 0 })
 
-  const [email, setEmail] = useState('telemetria@viasudeste.com')
-  const [password, setPassword] = useState('Skip@Pass')
-  const [isLoggingIn, setIsLoggingIn] = useState(false)
-
-  const [loadingSync, setLoadingSync] = useState(false)
-  const [syncStates, setSyncStates] = useState<any[]>([])
-
-  const fetchSyncStates = async () => {
+  const loadStats = async () => {
     try {
-      const records = await pb.collection('sync_state').getFullList({ sort: '-updated' })
-      setSyncStates(records)
+      const [tripsData, eventsData, locationsData] = await Promise.all([
+        pb.collection('trips').getList(1, 1),
+        pb.collection('trip_events').getList(1, 1),
+        pb.collection('trip_locations').getList(1, 1),
+      ])
+
+      setStats({
+        trips: tripsData.totalItems,
+        events: eventsData.totalItems,
+        locations: locationsData.totalItems,
+      })
     } catch (err) {
-      console.error(err)
+      console.error('Failed to load initial stats', err)
     }
   }
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchSyncStates()
-    }
-  }, [isAuthenticated])
+    loadStats()
+  }, [])
 
-  useRealtime('sync_state', () => {
-    if (isAuthenticated) {
-      fetchSyncStates()
-    }
-  })
+  useRealtime('trips', () => loadStats())
+  useRealtime('trip_events', () => loadStats())
+  useRealtime('trip_locations', () => loadStats())
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoggingIn(true)
-    const { error } = await signIn(email, password)
-    setIsLoggingIn(false)
-    if (error) {
-      toast({ title: 'Login Failed', description: error.message, variant: 'destructive' })
-    }
-  }
+  return (
+    <div className="container mx-auto py-8 px-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard de Operações</h1>
+          <p className="text-muted-foreground mt-1">
+            Visão geral do volume de dados processados em tempo real.
+          </p>
+        </div>
+        <Link to="/admin/sync">
+          <Button variant="default">Sincronização Datalbus</Button>
+        </Link>
+      </div>
 
-  const handleSync = async () => {
-    try {
-      setLoadingSync(true)
-      await pb.send('/backend/v1/sync_datalbus_catalogs', { method: 'POST' })
-      toast({ title: 'Sync completed', description: 'Catalogs have been synced successfully.' })
-    } catch (err: any) {
-      toast({
-        title: 'Sync failed',
-        description: err.message || 'An error occurred during sync',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoadingSync(false)
-    }
-  }
-
-  if (authLoading)
-    return <div className="flex h-screen items-center justify-center">Loading...</div>
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Login</CardTitle>
-            <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Viagens Processadas</CardTitle>
+            <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={isLoggingIn}>
-                {isLoggingIn ? 'Logging in...' : 'Log in'}
-              </Button>
-            </form>
+            <div className="text-3xl font-bold">{stats.trips.toLocaleString('pt-BR')}</div>
+            <p className="text-xs text-muted-foreground mt-1">Viagens únicas registradas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Eventos de Telemetria</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.events.toLocaleString('pt-BR')}</div>
+            <p className="text-xs text-muted-foreground mt-1">Alertas e ocorrências geradas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pontos de Coordenada</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.locations.toLocaleString('pt-BR')}</div>
+            <p className="text-xs text-muted-foreground mt-1">Posições geográficas armazenadas</p>
           </CardContent>
         </Card>
       </div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto py-8 px-4 max-w-5xl space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Via Sudeste Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage and sync your Datalbus catalogs</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={handleSync} disabled={loadingSync}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loadingSync ? 'animate-spin' : ''}`} />
-            {loadingSync ? 'Syncing...' : 'Trigger Sync'}
-          </Button>
-          <Button variant="outline" onClick={signOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Synchronization Status</CardTitle>
-          <CardDescription>Real-time status of the Datalbus integration endpoints.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Endpoint</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Processed</TableHead>
-                  <TableHead>Last Sync At</TableHead>
-                  <TableHead>Message</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {syncStates.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No sync records found. Trigger a sync to populate this table.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  syncStates.map((state) => (
-                    <TableRow key={state.id}>
-                      <TableCell className="font-medium capitalize">
-                        {state.endpoint_name}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={state.last_sync_status === 'success' ? 'default' : 'destructive'}
-                        >
-                          {state.last_sync_status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{state.records_processed}</TableCell>
-                      <TableCell>
-                        {state.last_sync_at ? new Date(state.last_sync_at).toLocaleString() : '-'}
-                      </TableCell>
-                      <TableCell
-                        className="text-red-500 max-w-[200px] truncate"
-                        title={state.error_message}
-                      >
-                        {state.error_message || '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

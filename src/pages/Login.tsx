@@ -1,55 +1,45 @@
-import { useState, FormEvent } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card'
-import { toast } from 'sonner'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Navigate } from 'react-router-dom'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
+  const [error, setError] = useState('')
+  const { signIn, isAuthenticated } = useAuth()
 
-  const handleLogin = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-    const { error } = await signIn(email, password)
-    setIsLoading(false)
-
-    if (error) {
-      toast.error('Erro ao fazer login. Verifique suas credenciais.')
-    } else {
-      toast.success('Login realizado com sucesso!')
-      navigate('/')
+    setError('')
+    const { error: signInError } = await signIn(email, password)
+    if (signInError) {
+      setError('Credenciais inválidas. Verifique seu e-mail e senha.')
     }
   }
 
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-secondary/30 px-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Telemetria Via Sudeste</CardTitle>
-          <CardDescription>Faça login para acessar o painel.</CardDescription>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Via Sudeste</CardTitle>
+          <CardDescription>Acesse o painel de monitoramento</CardDescription>
         </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@viasudeste.com"
+                placeholder="nome@viasudeste.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -65,13 +55,12 @@ export default function Login() {
                 required
               />
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Entrando...' : 'Entrar'}
+            {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
+            <Button type="submit" className="w-full">
+              Entrar
             </Button>
-          </CardFooter>
-        </form>
+          </form>
+        </CardContent>
       </Card>
     </div>
   )
