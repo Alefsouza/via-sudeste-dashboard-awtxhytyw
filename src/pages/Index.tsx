@@ -1,87 +1,126 @@
-import { useEffect, useState } from 'react'
-import pb from '@/lib/pocketbase/client'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { fetchDashboardData } from '@/services/dashboard'
 import { useRealtime } from '@/hooks/use-realtime'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Link } from 'react-router-dom'
+import { MapComponent } from '@/components/MapComponent'
+import { VehicleSidebar } from '@/components/VehicleSidebar'
+import { KPICards } from '@/components/KPICards'
+import { FloatingDetailsCard } from '@/components/FloatingDetailsCard'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Activity, MapPin, Truck } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
+import { MappedLocation } from '@/types'
+import { mapLocationData } from '@/lib/utils/mappers'
 
-export default function Index() {
-  const [stats, setStats] = useState({ trips: 0, events: 0, locations: 0 })
+export default function OperationalDashboard() {
+  const [data, setData] = useState<{ locations: any[]; trips: any[]; alerts: any[] } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<MappedLocation | null>(null)
 
-  const loadStats = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const [tripsData, eventsData, locationsData] = await Promise.all([
-        pb.collection('trips').getList(1, 1),
-        pb.collection('trip_events').getList(1, 1),
-        pb.collection('trip_locations').getList(1, 1),
-      ])
-
-      setStats({
-        trips: tripsData.totalItems,
-        events: eventsData.totalItems,
-        locations: locationsData.totalItems,
-      })
-    } catch (err) {
-      console.error('Failed to load initial stats', err)
+      const res = await fetchDashboardData()
+      setData(res)
+      setError(null)
+    } catch (err: any) {
+      setError(err)
+    } finally {
+      setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadStats()
   }, [])
 
-  useRealtime('trips', () => loadStats())
-  useRealtime('trip_events', () => loadStats())
-  useRealtime('trip_locations', () => loadStats())
+  useEffect(() => {
+    loadData()
+    const interval = setInterval(loadData, 60000)
+    return () => clearInterval(interval)
+  }, [loadData])
+
+  useRealtime('realtime_locations', () => {
+    loadData()
+  })
+  useRealtime('alerts', () => {
+    loadData()
+  })
+  useRealtime('trips', () => {
+    loadData()
+  })
+
+  const mappedLocations = useMemo(() => {
+    if (!data) return []
+
+    // Group by asset to assure only the latest location per vehicle
+    const latestByAsset = new Map<string, any>()
+    for (const loc of data.locations) {
+      const assetId = loc.asset_id || loc.id
+      const existing = latestByAsset.get(assetId)
+      if (
+        !existing ||
+        new Date(loc.recorded_at || loc.updated).getTime() >
+          new Date(existing.recorded_at || existing.updated).getTime()
+      ) {
+        latestByAsset.set(assetId, loc)
+      }
+    }
+
+    return Array.from(latestByAsset.values()).map((loc) => mapLocationData(loc, data.trips))
+  }, [data])
+
+  if (loading && !data) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-muted/20">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4 bg-muted/20">
+        <Alert variant="destructive" className="max-w-md shadow-sm">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro ao carregar dados</AlertTitle>
+          <AlertDescription>
+            Não foi possível carregar as informações do painel. Verifique sua conexão.
+            <Button onClick={loadData} variant="outline" className="mt-4 w-full text-foreground">
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard de Operações</h1>
-          <p className="text-muted-foreground mt-1">
-            Visão geral do volume de dados processados em tempo real.
-          </p>
-        </div>
-        <Link to="/admin/sync">
-          <Button variant="default">Sincronização Datalbus</Button>
-        </Link>
+    <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+      <div className="w-full md:w-80 lg:w-96 border-r flex flex-col bg-card shrink-0 z-10 shadow-sm">
+        <VehicleSidebar
+          locations={mappedLocations}
+          selectedId={selectedLocation?.id}
+          onSelect={setSelectedLocation}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Viagens Processadas</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.trips.toLocaleString('pt-BR')}</div>
-            <p className="text-xs text-muted-foreground mt-1">Viagens únicas registradas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Eventos de Telemetria</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.events.toLocaleString('pt-BR')}</div>
-            <p className="text-xs text-muted-foreground mt-1">Alertas e ocorrências geradas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pontos de Coordenada</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.locations.toLocaleString('pt-BR')}</div>
-            <p className="text-xs text-muted-foreground mt-1">Posições geográficas armazenadas</p>
-          </CardContent>
-        </Card>
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        <div className="p-4 border-b bg-card shrink-0 z-10 shadow-sm relative">
+          <KPICards
+            locations={mappedLocations}
+            totalTrips={data?.trips.length || 0}
+            totalAlerts={data?.alerts.length || 0}
+          />
+        </div>
+        <div className="flex-1 relative z-0">
+          <MapComponent
+            locations={mappedLocations}
+            selectedLocation={selectedLocation}
+            onSelect={setSelectedLocation}
+          />
+          {selectedLocation && (
+            <FloatingDetailsCard
+              location={selectedLocation}
+              onClose={() => setSelectedLocation(null)}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

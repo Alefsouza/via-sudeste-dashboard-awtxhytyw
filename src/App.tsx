@@ -1,28 +1,33 @@
 /* Main App Component - Handles routing (using react-router-dom), query client and other providers - use this file to add all routes */
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { Navigate, Outlet } from 'react-router-dom'
 import Index from './pages/Index'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
-import SyncDatalbus from './pages/admin/SyncDatalbus'
 import Login from './pages/Login'
+import VehicleDetails from './pages/VehicleDetails'
 import { AuthProvider, useAuth } from './hooks/use-auth'
+import { Loader2 } from 'lucide-react'
 
-// ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
-// AVOID REMOVING ANY CONTEXT PROVIDERS FROM THIS FILE (e.g. TooltipProvider, Toaster, Sonner)
-
-const ProtectedRoute = () => {
+function ProtectedRoute() {
   const { isAuthenticated, loading } = useAuth()
-  if (loading) return null
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
 }
 
 const App = () => (
-  <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
-    <AuthProvider>
+  <AuthProvider>
+    <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -31,15 +36,14 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
-              <Route path="/admin/sync" element={<SyncDatalbus />} />
-              {/* ADD ALL CUSTOM ROUTES MUST BE ADDED HERE */}
+              <Route path="/vehicles/:id" element={<VehicleDetails />} />
             </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </TooltipProvider>
-    </AuthProvider>
-  </BrowserRouter>
+    </BrowserRouter>
+  </AuthProvider>
 )
 
 export default App
