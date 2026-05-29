@@ -1,192 +1,199 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAssets, useDrivers, useTrips, useEvents } from '@/hooks/use-telemetry'
-import { LoadingState, ErrorState, EmptyState } from '@/components/ui-state'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
+import { useToast } from '@/hooks/use-toast'
+import { useRealtime } from '@/hooks/use-realtime'
+import pb from '@/lib/pocketbase/client'
+
 import { Button } from '@/components/ui/button'
-import { LogOut, Truck, Users, Route, AlertTriangle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-
-function AssetsTab() {
-  const { data, loading, error, refetch } = useAssets()
-
-  if (error) return <ErrorState error={error} onRetry={refetch} />
-  if (loading) return <LoadingState skeletonCount={5} />
-  if (!data.length) return <EmptyState message="Nenhum veículo encontrado" />
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {data.map((asset) => (
-        <Card key={asset.id}>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex justify-between items-center text-lg">
-              {asset.license_plate || asset.plate || 'Sem Placa'}
-              <Badge variant={asset.status === 'ativo' ? 'default' : 'secondary'}>
-                {asset.status || 'Desconhecido'}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Frota: {asset.fleet_number || 'N/A'}</p>
-            <p className="text-sm text-muted-foreground">
-              Modelo: {asset.model || '-'} - {asset.brand || '-'}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-function DriversTab() {
-  const { data, loading, error, refetch } = useDrivers()
-
-  if (error) return <ErrorState error={error} onRetry={refetch} />
-  if (loading) return <LoadingState skeletonCount={5} />
-  if (!data.length) return <EmptyState message="Nenhum motorista encontrado" />
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {data.map((driver) => (
-        <Card key={driver.id}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">
-              {driver.name || driver.driver_name || 'Sem nome'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">CNH: {driver.license_number || 'N/A'}</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Status: <Badge variant="outline">{driver.status || 'Ativo'}</Badge>
-            </p>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-function TripsTab() {
-  const { data, loading, error, refetch } = useTrips()
-
-  if (error) return <ErrorState error={error} onRetry={refetch} />
-  if (loading) return <LoadingState skeletonCount={5} />
-  if (!data.length) return <EmptyState message="Nenhuma viagem encontrada" />
-
-  return (
-    <div className="space-y-4">
-      {data.map((trip) => (
-        <Card key={trip.id}>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="font-medium">
-                Veículo:{' '}
-                {trip.expand?.asset_id?.license_plate ||
-                  trip.expand?.asset_id?.plate ||
-                  'Desconhecido'}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Motorista: {trip.expand?.driver_id?.name || 'Desconhecido'}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-medium">
-                {trip.distance ? `${trip.distance.toFixed(1)} km` : '-'}
-              </p>
-              <p className="text-sm text-muted-foreground">Score: {trip.score || '-'}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-function EventsTab() {
-  const { data, loading, error, refetch } = useEvents()
-
-  if (error) return <ErrorState error={error} onRetry={refetch} />
-  if (loading) return <LoadingState skeletonCount={5} />
-  if (!data.length) return <EmptyState message="Nenhum evento encontrado" />
-
-  return (
-    <div className="space-y-4">
-      {data.map((event) => (
-        <Card key={event.id}>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                {event.expand?.event_type_id?.name || 'Evento Desconhecido'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Veículo:{' '}
-                {event.expand?.asset_id?.license_plate || event.expand?.asset_id?.plate || '-'} |
-                Motorista: {event.expand?.driver_id?.name || '-'}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-medium">{event.speed ? `${event.speed} km/h` : '-'}</p>
-              <p className="text-sm text-muted-foreground">
-                {event.start_time ? new Date(event.start_time).toLocaleString('pt-BR') : '-'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
+import { LogOut, RefreshCw } from 'lucide-react'
 
 export default function Index() {
-  const { signOut } = useAuth()
+  const { isAuthenticated, signIn, signOut, loading: authLoading } = useAuth()
+  const { toast } = useToast()
+
+  const [email, setEmail] = useState('telemetria@viasudeste.com')
+  const [password, setPassword] = useState('Skip@Pass')
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+
+  const [loadingSync, setLoadingSync] = useState(false)
+  const [syncStates, setSyncStates] = useState<any[]>([])
+
+  const fetchSyncStates = async () => {
+    try {
+      const records = await pb.collection('sync_state').getFullList({ sort: '-updated' })
+      setSyncStates(records)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchSyncStates()
+    }
+  }, [isAuthenticated])
+
+  useRealtime('sync_state', () => {
+    if (isAuthenticated) {
+      fetchSyncStates()
+    }
+  })
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoggingIn(true)
+    const { error } = await signIn(email, password)
+    setIsLoggingIn(false)
+    if (error) {
+      toast({ title: 'Login Failed', description: error.message, variant: 'destructive' })
+    }
+  }
+
+  const handleSync = async () => {
+    try {
+      setLoadingSync(true)
+      await pb.send('/backend/v1/sync_datalbus_catalogs', { method: 'POST' })
+      toast({ title: 'Sync completed', description: 'Catalogs have been synced successfully.' })
+    } catch (err: any) {
+      toast({
+        title: 'Sync failed',
+        description: err.message || 'An error occurred during sync',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingSync(false)
+    }
+  }
+
+  if (authLoading)
+    return <div className="flex h-screen items-center justify-center">Loading...</div>
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Login</CardTitle>
+            <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                {isLoggingIn ? 'Logging in...' : 'Log in'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Route className="h-6 w-6 text-primary" />
-            Via Sudeste Dashboard
-          </h1>
-          <Button variant="ghost" size="sm" onClick={signOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
+    <div className="container mx-auto py-8 px-4 max-w-5xl space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Via Sudeste Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Manage and sync your Datalbus catalogs</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleSync} disabled={loadingSync}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loadingSync ? 'animate-spin' : ''}`} />
+            {loadingSync ? 'Syncing...' : 'Trigger Sync'}
+          </Button>
+          <Button variant="outline" onClick={signOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
           </Button>
         </div>
-      </header>
+      </div>
 
-      <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="assets" className="space-y-6">
-          <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full h-auto">
-            <TabsTrigger value="assets" className="flex gap-2 py-3">
-              <Truck className="h-4 w-4" /> Veículos
-            </TabsTrigger>
-            <TabsTrigger value="drivers" className="flex gap-2 py-3">
-              <Users className="h-4 w-4" /> Motoristas
-            </TabsTrigger>
-            <TabsTrigger value="trips" className="flex gap-2 py-3">
-              <Route className="h-4 w-4" /> Viagens
-            </TabsTrigger>
-            <TabsTrigger value="events" className="flex gap-2 py-3">
-              <AlertTriangle className="h-4 w-4" /> Eventos
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="assets">
-            <AssetsTab />
-          </TabsContent>
-          <TabsContent value="drivers">
-            <DriversTab />
-          </TabsContent>
-          <TabsContent value="trips">
-            <TripsTab />
-          </TabsContent>
-          <TabsContent value="events">
-            <EventsTab />
-          </TabsContent>
-        </Tabs>
-      </main>
+      <Card>
+        <CardHeader>
+          <CardTitle>Synchronization Status</CardTitle>
+          <CardDescription>Real-time status of the Datalbus integration endpoints.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Endpoint</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Processed</TableHead>
+                  <TableHead>Last Sync At</TableHead>
+                  <TableHead>Message</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {syncStates.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No sync records found. Trigger a sync to populate this table.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  syncStates.map((state) => (
+                    <TableRow key={state.id}>
+                      <TableCell className="font-medium capitalize">
+                        {state.endpoint_name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={state.last_sync_status === 'success' ? 'default' : 'destructive'}
+                        >
+                          {state.last_sync_status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{state.records_processed}</TableCell>
+                      <TableCell>
+                        {state.last_sync_at ? new Date(state.last_sync_at).toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell
+                        className="text-red-500 max-w-[200px] truncate"
+                        title={state.error_message}
+                      >
+                        {state.error_message || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
