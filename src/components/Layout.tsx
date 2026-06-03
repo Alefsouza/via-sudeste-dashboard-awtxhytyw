@@ -1,62 +1,32 @@
-/* Layout Component - A component that wraps the main content of the app
-   - Use this file to add a header, footer, or other elements that should be present on every page
-   - This component is used in the App.tsx file to wrap the main content of the app */
-
-import { Outlet, Link, useLocation } from 'react-router-dom'
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarTrigger,
-  SidebarInset,
-} from '@/components/ui/sidebar'
-import { Activity, LayoutDashboard, Wrench } from 'lucide-react'
+import { Outlet, Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
+import { LogOut, Activity } from 'lucide-react'
 
 export default function Layout() {
-  const location = useLocation()
+  const { signOut, user } = useAuth()
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader className="h-16 flex items-center px-4 border-b">
-          <div className="flex items-center gap-2 font-semibold text-lg">
-            <Activity className="h-6 w-6 text-primary" />
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="border-b bg-card">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 font-bold text-xl text-primary">
+            <Activity className="h-6 w-6" />
             <span>Via Sudeste</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground hidden sm:inline-block">
+              {user?.email}
+            </span>
+            <Button variant="ghost" size="icon" onClick={() => signOut()} title="Sair">
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={location.pathname === '/'}>
-                <Link to="/">
-                  <LayoutDashboard />
-                  <span>Início</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={location.pathname === '/manutencao'}>
-                <Link to="/manutencao">
-                  <Wrench />
-                  <span>Manutenção</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-      </Sidebar>
-      <SidebarInset className="flex flex-col flex-1 w-full min-h-screen overflow-hidden">
-        <header className="h-16 flex items-center px-4 border-b shrink-0 bg-background">
-          <SidebarTrigger />
-        </header>
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto bg-muted/20">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+        </div>
+      </header>
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+    </div>
   )
 }
