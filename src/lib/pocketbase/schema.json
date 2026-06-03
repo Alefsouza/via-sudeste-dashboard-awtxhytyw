@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-03T16:08:46.313Z",
+  "generatedAt": "2026-06-03T23:48:53.186Z",
   "collections": [
     {
       "name": "users",
@@ -29,30 +29,21 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "role",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "operador",
-            "gestor",
-            "admin"
-          ]
+          "selectValues": ["operador", "gestor", "admin"]
         }
       ],
       "indexes": [
@@ -88,11 +79,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "moving",
-            "idle",
-            "maintenance"
-          ]
+          "selectValues": ["moving", "idle", "maintenance"]
         },
         {
           "name": "last_latitude",
@@ -111,30 +98,21 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "garage",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "Cursino",
-            "Sapopemba",
-            "Imirim"
-          ]
+          "selectValues": ["Cursino", "Sapopemba", "Imirim"]
         }
       ],
       "indexes": [
@@ -189,24 +167,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE INDEX idx_telemetry_vehicle ON telemetry_logs (vehicle_id, created DESC)"
-      ]
+      "indexes": ["CREATE INDEX idx_telemetry_vehicle ON telemetry_logs (vehicle_id, created DESC)"]
     },
     {
       "name": "alerts",
@@ -231,22 +202,14 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "overspeed",
-            "harsh_braking",
-            "low_fuel"
-          ]
+          "selectValues": ["overspeed", "harsh_braking", "low_fuel"]
         },
         {
           "name": "severity",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "low",
-            "medium",
-            "high"
-          ]
+          "selectValues": ["low", "medium", "high"]
         },
         {
           "name": "message",
@@ -265,19 +228,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "event_name",
@@ -304,9 +262,7 @@
           "system": false
         }
       ],
-      "indexes": [
-        "CREATE INDEX idx_alerts_vehicle ON alerts (vehicle_id, severity, resolved)"
-      ]
+      "indexes": ["CREATE INDEX idx_alerts_vehicle ON alerts (vehicle_id, severity, resolved)"]
     },
     {
       "name": "drivers",
@@ -342,19 +298,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "driver_id",
@@ -462,24 +413,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE UNIQUE INDEX idx_integration_cache_key ON integration_cache (key)"
-      ]
+      "indexes": ["CREATE UNIQUE INDEX idx_integration_cache_key ON integration_cache (key)"]
     },
     {
       "name": "sync_logs",
@@ -497,23 +441,14 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "assets",
-            "drivers",
-            "trips",
-            "events",
-            "all"
-          ]
+          "selectValues": ["assets", "drivers", "trips", "events", "all"]
         },
         {
           "name": "status",
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "success",
-            "error"
-          ]
+          "selectValues": ["success", "error"]
         },
         {
           "name": "records_count",
@@ -538,19 +473,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "records_created",
@@ -601,29 +531,21 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "asset_id",
@@ -751,19 +673,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "trip_id",
@@ -945,14 +862,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "alta",
-            "média",
-            "baixa",
-            "high",
-            "medium",
-            "low"
-          ]
+          "selectValues": ["alta", "média", "baixa", "high", "medium", "low"]
         },
         {
           "name": "timestamp",
@@ -971,19 +881,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "event_id",
@@ -1125,31 +1030,21 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "category",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "alerta",
-            "evento",
-            "sumario",
-            "histograma"
-          ]
+          "selectValues": ["alerta", "evento", "sumario", "histograma"]
         },
         {
           "name": "description",
@@ -1202,19 +1097,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": []
@@ -1260,19 +1150,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": []
@@ -1363,24 +1248,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE INDEX `idx_events_start_time` ON `events` (start_time)"
-      ]
+      "indexes": ["CREATE INDEX `idx_events_start_time` ON `events` (start_time)"]
     },
     {
       "name": "trip_locations",
@@ -1435,24 +1313,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE INDEX `idx_trip_locations_recorded_at` ON `trip_locations` (recorded_at)"
-      ]
+      "indexes": ["CREATE INDEX `idx_trip_locations_recorded_at` ON `trip_locations` (recorded_at)"]
     },
     {
       "name": "realtime_locations",
@@ -1513,19 +1384,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": [
@@ -1598,19 +1464,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": []
@@ -1661,24 +1522,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE UNIQUE INDEX idx_sync_state_endpoint ON sync_state (endpoint_name)"
-      ]
+      "indexes": ["CREATE UNIQUE INDEX idx_sync_state_endpoint ON sync_state (endpoint_name)"]
     },
     {
       "name": "admin_config",
@@ -1715,24 +1569,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE UNIQUE INDEX idx_admin_config_key ON admin_config (config_key)"
-      ]
+      "indexes": ["CREATE UNIQUE INDEX idx_admin_config_key ON admin_config (config_key)"]
     },
     {
       "name": "user_profiles",
@@ -1769,30 +1616,21 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "operador",
-            "gestor",
-            "admin"
-          ]
+          "selectValues": ["operador", "gestor", "admin"]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": []
