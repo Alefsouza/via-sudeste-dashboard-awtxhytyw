@@ -76,19 +76,49 @@ migrate(
       return col
     }
 
-    const garages = syncCollection('garages', [
-      { name: 'name', type: 'text', required: true },
-      { name: 'short_name', type: 'text', required: true },
-      { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-      { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-    ])
+    let garages
+    try {
+      garages = app.findCollectionByNameOrId('garages')
+    } catch (_) {
+      garages = new Collection({
+        name: 'garages',
+        type: 'base',
+        listRule: authRule,
+        viewRule: authRule,
+        createRule: authRule,
+        updateRule: authRule,
+        deleteRule: authRule,
+        fields: [
+          { name: 'name', type: 'text', required: true },
+          { name: 'short_name', type: 'text', required: true },
+          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+        ],
+      })
+      app.save(garages)
+    }
 
-    const asset_group_mapping = syncCollection('asset_group_mapping', [
-      { name: 'group_raw', type: 'text', required: true },
-      { name: 'garage_id', type: 'relation', collectionId: garages.id, maxSelect: 1 },
-      { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-      { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-    ])
+    let asset_group_mapping
+    try {
+      asset_group_mapping = app.findCollectionByNameOrId('asset_group_mapping')
+    } catch (_) {
+      asset_group_mapping = new Collection({
+        name: 'asset_group_mapping',
+        type: 'base',
+        listRule: authRule,
+        viewRule: authRule,
+        createRule: authRule,
+        updateRule: authRule,
+        deleteRule: authRule,
+        fields: [
+          { name: 'group_raw', type: 'text', required: true },
+          { name: 'garage_id', type: 'relation', collectionId: garages.id, maxSelect: 1 },
+          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+        ],
+      })
+      app.save(asset_group_mapping)
+    }
 
     const assets = syncCollection(
       'assets',

@@ -1,18 +1,7 @@
 migrate(
   (app) => {
-    let garagesCol
-    try {
-      garagesCol = app.findCollectionByNameOrId('garages')
-    } catch (_) {
-      garagesCol = app.findCollectionByNameOrId('Garages')
-    }
-
-    let mappingCol
-    try {
-      mappingCol = app.findCollectionByNameOrId('asset_group_mapping')
-    } catch (_) {
-      mappingCol = app.findCollectionByNameOrId('Asset_group_mapping')
-    }
+    const garagesCol = app.findCollectionByNameOrId('garages')
+    const mappingCol = app.findCollectionByNameOrId('asset_group_mapping')
 
     const garagesToSeed = [
       { name: 'Garagem Cursino', short_name: 'Cursino' },

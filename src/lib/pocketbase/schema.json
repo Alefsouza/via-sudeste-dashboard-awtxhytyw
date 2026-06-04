@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-04T00:20:33.907Z",
+  "generatedAt": "2026-06-04T00:28:01.907Z",
   "collections": [
     {
       "name": "users",
@@ -372,11 +372,35 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "internal_id",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cargo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "garagem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_reserva",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
-        "CREATE UNIQUE INDEX `idx_drivers_driver_id` ON `drivers` (driver_id)",
-        "CREATE UNIQUE INDEX `idx_drivers_worker_id` ON `drivers` (worker_id) WHERE worker_id != 0"
+        "CREATE UNIQUE INDEX `idx_drivers_worker_id` ON `drivers` (worker_id) WHERE worker_id != 0",
+        "CREATE UNIQUE INDEX `idx_drivers_driver_id` ON `drivers` (driver_id)"
       ]
     },
     {
@@ -619,11 +643,25 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "asset_group_raw",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "garage_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "garages"
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_assets_vehicle_id ON assets (vehicle_id)",
-        "CREATE UNIQUE INDEX `idx_assets_asset_id` ON `assets` (asset_id)"
+        "CREATE UNIQUE INDEX `idx_assets_asset_id` ON `assets` (asset_id)",
+        "CREATE INDEX `idx_assets_garage_id` ON `assets` (garage_id)"
       ]
     },
     {
@@ -818,7 +856,8 @@
       ],
       "indexes": [
         "CREATE UNIQUE INDEX `idx_trips_trip_id` ON `trips` (trip_id)",
-        "CREATE INDEX `idx_trips_asset_id` ON `trips` (asset_id)"
+        "CREATE INDEX `idx_trips_asset_id` ON `trips` (asset_id)",
+        "CREATE INDEX `idx_trips_driver_id` ON `trips` (driver_id)"
       ]
     },
     {
@@ -987,13 +1026,23 @@
           "type": "number",
           "required": false,
           "system": false
+        },
+        {
+          "name": "driver_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "drivers"
         }
       ],
       "indexes": [
         "CREATE INDEX idx_trip_events_vehicle_id ON trip_events (vehicle_id)",
         "CREATE UNIQUE INDEX `idx_trip_events_event_id` ON `trip_events` (event_id)",
+        "CREATE INDEX `idx_trip_events_trip_id` ON `trip_events` (trip_id)",
         "CREATE INDEX `idx_trip_events_asset_id` ON `trip_events` (asset_id)",
-        "CREATE INDEX `idx_trip_events_trip_id` ON `trip_events` (trip_id)"
+        "CREATE INDEX `idx_trip_events_event_type_id` ON `trip_events` (event_type_id)",
+        "CREATE INDEX `idx_trip_events_start_time` ON `trip_events` (start_time DESC)",
+        "CREATE INDEX `idx_trip_events_asset_start` ON `trip_events` (asset_id, start_time DESC)"
       ]
     },
     {
@@ -1321,9 +1370,21 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "asset_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "assets"
         }
       ],
-      "indexes": ["CREATE INDEX `idx_trip_locations_recorded_at` ON `trip_locations` (recorded_at)"]
+      "indexes": [
+        "CREATE INDEX `idx_trip_locations_trip_id` ON `trip_locations` (trip_id)",
+        "CREATE INDEX `idx_trip_locations_asset_id` ON `trip_locations` (asset_id)",
+        "CREATE INDEX `idx_trip_locations_recorded_at` ON `trip_locations` (recorded_at DESC)",
+        "CREATE INDEX `idx_trip_locations_asset_recorded` ON `trip_locations` (asset_id, recorded_at DESC)"
+      ]
     },
     {
       "name": "realtime_locations",
@@ -1617,6 +1678,327 @@
           "required": false,
           "system": false,
           "selectValues": ["operador", "gestor", "admin"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "garages",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "short_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "asset_group_mapping",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "group_raw",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "garage_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "garages"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "asset_scores",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "asset_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "assets"
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "period_start",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "period_end",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "notifications",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "read",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "geofences",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "polygon",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "asset_geofence_events",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "asset_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "assets"
+        },
+        {
+          "name": "geofence_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "geofences"
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "ranking_snapshots",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "snapshot_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data",
+          "type": "json",
+          "required": false,
+          "system": false
         },
         {
           "name": "created",
