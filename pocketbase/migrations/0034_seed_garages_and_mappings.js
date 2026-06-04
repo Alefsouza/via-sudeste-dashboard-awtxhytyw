@@ -1,7 +1,18 @@
 migrate(
   (app) => {
-    const garagesCol = app.findCollectionByNameOrId('garages')
-    const mappingCol = app.findCollectionByNameOrId('asset_group_mapping')
+    let garagesCol
+    try {
+      garagesCol = app.findCollectionByNameOrId('garages')
+    } catch (_) {
+      garagesCol = app.findCollectionByNameOrId('Garages')
+    }
+
+    let mappingCol
+    try {
+      mappingCol = app.findCollectionByNameOrId('asset_group_mapping')
+    } catch (_) {
+      mappingCol = app.findCollectionByNameOrId('Asset_group_mapping')
+    }
 
     const garagesToSeed = [
       { name: 'Garagem Cursino', short_name: 'Cursino' },
@@ -15,7 +26,7 @@ migrate(
       const g = garagesToSeed[i]
       let rec
       try {
-        rec = app.findFirstRecordByData('garages', 'name', g.name)
+        rec = app.findFirstRecordByData(garagesCol.id, 'name', g.name)
       } catch (_) {
         rec = new Record(garagesCol)
         rec.set('name', g.name)
@@ -37,7 +48,7 @@ migrate(
       const m = mappingsToSeed[i]
       let rec
       try {
-        rec = app.findFirstRecordByData('asset_group_mapping', 'group_raw', m.group_raw)
+        rec = app.findFirstRecordByData(mappingCol.id, 'group_raw', m.group_raw)
       } catch (_) {
         rec = new Record(mappingCol)
         rec.set('group_raw', m.group_raw)
@@ -50,8 +61,18 @@ migrate(
   },
   (app) => {
     try {
-      app.db().newQuery('DELETE FROM asset_group_mapping').execute()
-      app.db().newQuery('DELETE FROM garages').execute()
+      const mappingCol = app.findCollectionByNameOrId('asset_group_mapping')
+      app
+        .db()
+        .newQuery('DELETE FROM ' + mappingCol.name)
+        .execute()
+    } catch (_) {}
+    try {
+      const garagesCol = app.findCollectionByNameOrId('garages')
+      app
+        .db()
+        .newQuery('DELETE FROM ' + garagesCol.name)
+        .execute()
     } catch (_) {}
   },
 )
