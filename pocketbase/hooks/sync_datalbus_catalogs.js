@@ -148,14 +148,58 @@ routerAdd(
 
           if (ep.collection === 'assets') {
             if (item.id) record.set('asset_id', item.id)
-            if (item.description) record.set('asset_description', item.description)
+            if (item.license_plate) record.set('license_plate', item.license_plate)
+
+            const groupRaw = item.group_desc || item.asset_group || item.group || ''
+            if (groupRaw) {
+              record.set('asset_group_raw', groupRaw)
+              try {
+                const mapRec = $app.findFirstRecordByData(
+                  'asset_group_mapping',
+                  'group_raw',
+                  groupRaw,
+                )
+                const gId = mapRec.getString('garage_id')
+                if (gId) record.set('garage_id', gId)
+              } catch (_) {}
+            }
           } else if (ep.collection === 'drivers') {
             if (item.id) record.set('driver_id', item.id)
-            if (item.name) record.set('driver_name', item.name)
+            if (item.internal_id) record.set('internal_id', item.internal_id)
+            if (item.name) record.set('name', item.name)
+
+            const groupDesc = item.group_desc || item.group || ''
+            if (groupDesc) {
+              record.set('group_desc', groupDesc)
+              let cargo = ''
+              let garagem = ''
+              if (groupDesc.includes(' - ')) {
+                const parts = groupDesc.split(' - ')
+                cargo = parts[0].trim()
+                garagem = parts[1].trim()
+              } else if (groupDesc.includes('-')) {
+                const parts = groupDesc.split('-')
+                cargo = parts[0].trim()
+                garagem = parts[1].trim()
+              } else {
+                cargo = groupDesc
+              }
+              record.set('cargo', cargo)
+              record.set('garagem', garagem)
+              record.set('is_reserva', groupDesc.toLowerCase().includes('reserva'))
+            }
           } else if (ep.collection === 'devices') {
             if (item.code) record.set('device_code', item.code)
+            if (item.asset_id) {
+              try {
+                const assetRec = $app.findFirstRecordByData('assets', 'asset_id', item.asset_id)
+                record.set('asset_id', assetRec.id)
+              } catch (_) {}
+            }
           } else if (ep.collection === 'event_types') {
             if (item.id) record.set('event_type_id', item.id)
+            if (item.name) record.set('name', item.name)
+            if (item.description) record.set('description', item.description)
           }
 
           try {

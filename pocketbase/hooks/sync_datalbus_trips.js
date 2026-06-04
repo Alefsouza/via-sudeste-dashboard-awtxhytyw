@@ -167,17 +167,8 @@ routerAdd(
             if (vehicleIdentifier) {
               try {
                 const asset = txApp.findFirstRecordByData('assets', 'asset_id', vehicleIdentifier)
-                tripRecord.set('vehicle_id', asset.id)
-              } catch (_) {
-                try {
-                  const assetByStr = txApp.findFirstRecordByData(
-                    'assets',
-                    'vehicle_id',
-                    String(vehicleIdentifier),
-                  )
-                  tripRecord.set('vehicle_id', assetByStr.id)
-                } catch (__) {}
-              }
+                tripRecord.set('asset_id', asset.id)
+              } catch (_) {}
             }
 
             if (trip.driver_id) {
@@ -205,12 +196,25 @@ routerAdd(
               }
 
               eventRecord.set('trip_id', tripRecord.id)
-              if (event.event_type) eventRecord.set('event_type', event.event_type)
-              if (event.severity) eventRecord.set('severity', event.severity)
-              if (event.timestamp) eventRecord.set('timestamp', event.timestamp)
-              else if (event.start_time) eventRecord.set('start_time', event.start_time)
+              eventRecord.set('asset_id', tripRecord.getString('asset_id'))
+              eventRecord.set('driver_id', tripRecord.getString('driver_id'))
 
-              if (event.description) eventRecord.set('description', event.description)
+              if (event.event_type_id) {
+                try {
+                  const evType = txApp.findFirstRecordByData(
+                    'event_types',
+                    'event_type_id',
+                    event.event_type_id,
+                  )
+                  eventRecord.set('event_type_id', evType.id)
+                } catch (_) {}
+              }
+
+              if (event.severity) eventRecord.set('severity', event.severity)
+              if (event.timestamp) eventRecord.set('start_time', event.timestamp)
+              else if (event.start_time) eventRecord.set('start_time', event.start_time)
+              if (event.end_time) eventRecord.set('end_time', event.end_time)
+
               if (event.latitude != null) eventRecord.set('latitude', event.latitude)
               if (event.longitude != null) eventRecord.set('longitude', event.longitude)
               if (event.speed != null) eventRecord.set('speed', event.speed)
@@ -238,6 +242,7 @@ routerAdd(
               } catch (_) {
                 locRecord = new Record(locationsCol)
                 locRecord.set('trip_id', tripRecord.id)
+                locRecord.set('asset_id', tripRecord.getString('asset_id'))
                 locRecord.set('recorded_at', recordedAt)
               }
 

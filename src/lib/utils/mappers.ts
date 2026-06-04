@@ -20,7 +20,7 @@ export function mapLocationData(loc: any, trips: any[]): MappedLocation {
   const vehicleId = asset?.id
 
   // Find recent driver from trips collection
-  const recentTrip = trips.find((t) => t.vehicle_id === vehicleId || t.asset_id === asset?.asset_id)
+  const recentTrip = trips.find((t) => t.asset_id === vehicleId || t.asset_id === asset?.id)
   const driverName = recentTrip?.expand?.driver_id?.name || 'Não identificado'
 
   return {
@@ -34,7 +34,7 @@ export function mapLocationData(loc: any, trips: any[]): MappedLocation {
     updated: loc.updated,
     status,
     driverName,
-    license_plate: asset?.license_plate || asset?.plate || 'Sem Placa',
-    fleet_number: asset?.fleet_number || asset?.asset_id?.toString() || '-',
+    license_plate: asset?.license_plate || 'Sem Placa',
+    fleet_number: asset?.asset_group_raw || asset?.asset_id?.toString() || '-',
   }
 }
